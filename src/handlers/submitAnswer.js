@@ -60,42 +60,6 @@ async function submit(event, context, callback) {
       } catch(err) {
         console.error(err);
       }
-
-    // context.callbackWaitsForEmptyEventLoop = true;
-
-    // console.log('event: ', event);
-
-    // connectToDatabase(MONGODB_URI)
-    //     .then(db => queryDatabase(db))
-    //     .then(result => {
-    //         console.log('=> returning result: ', result);
-    //          callback(result);
-    //     })
-    //     .catch(err => {
-    //         console.log('=> an error occurred: ', err);
-    //         return err;
-    //     });
-
-    //     return success;
-
-    // save message in database for later
-    //TEst mongo
-    // var MongoClient = require('mongodb').MongoClient;
-    // MongoClient.connect('mongodb+srv://noggleBoggleServer-dev:19SkCxi6II7L0Xth@noggleboggleeast.uppax.mongodb.net/test', function (err, mongoDb) {
-    //     if (err) {
-    //         console.log('ERRORORS');
-    //         console.log(err);
-    //         return fail500;
-
-
-    //     } else {
-    //         console.log('hihihih')
-    //         // let connection = mongoDb.db('noggle-boggle-trivia-dev');
-    //         // console.log(connection);
-    //         // mongoCollection = connection;
-    //         return success;
-    //     }
-    // });
 }
 
 

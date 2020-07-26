@@ -106,7 +106,7 @@ function connectToDatabase(uri) {
             resolve(cachedDb);
         }
     
-        MongoClient.connect('mongodb+srv://noggleBoggleServer-dev:19SkCxi6II7L0Xth@noggleboggleeast.uppax.mongodb.net/test', function (err, mongoDb) {
+        MongoClient.connect('', function (err, mongoDb) {
             if (err) {
                 console.log('ERRORORS');
                 console.log(err);

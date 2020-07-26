@@ -15,16 +15,16 @@ async function connectionManager(event, context) {
 
   if (event.requestContext.eventType === "CONNECT") {
     // sub general channel
-    await subscribeChannel(
-      {
-        ...event,
-        body: JSON.stringify({
-          action: "subscribe",
-          channelId: "General"
-        })
-      },
-      context
-    );
+    // await subscribeChannel(
+    //   {
+    //     ...event,
+    //     body: JSON.stringify({
+    //       action: "subscribe",
+    //       channelId: "General"
+    //     })
+    //   },
+    //   context
+    // );
 
     return success;
   } else if (event.requestContext.eventType === "DISCONNECT") {

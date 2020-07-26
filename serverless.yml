@@ -73,6 +73,13 @@ functions:
       - websocket:
           route: submitAnswer
 
+  # joinGame
+  joinGame:
+    handler: src/handlers/joinGame.join
+    events:
+      - websocket:
+          route: joinGame
+
   # Channel Subscriptions
   channelManager:
     handler: src/handler.channelManager

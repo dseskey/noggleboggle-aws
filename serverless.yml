@@ -81,11 +81,11 @@ functions:
           route: joinGame
 
   # gameStatus
-  gameStatus:
-    handler: src/handlers/game.currentGameStatus
-    events:
-      - websocket:
-          route: currentGameStatus
+  # gameStatus:
+  #   handler: src/handlers/game.currentGameStatus
+  #   events:
+  #     - websocket:
+  #         route: currentGameStatus
 
 
   # Channel Subscriptions

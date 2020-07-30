@@ -3,11 +3,10 @@
 const db = require("../db");
 const ws = require("../websocket-client");
 const sanitize = require("sanitize-html");
-"use strict";
-const MongoClient = require('mongodb').MongoClient;
-const MONGODB_URI = '';
+const mongoConnection = require('../mongo/mongoConnection').connectToDatabase;
 
-let cachedDb = null;
+"use strict";
+
 const wsClient = new ws.Client();
 
 const success = {
@@ -17,7 +16,6 @@ const success = {
 const fail500 = {
     statusCode: 500
 };
-
 
 
 async function join(event, context, callback) {
@@ -30,7 +28,7 @@ async function join(event, context, callback) {
     //Get Collection to validate game code.
     //If user is in game, return the game details for the question, else add, update the game details, and return the game
     try {
-        const mongoDb = await connectToDatabase(MONGODB_URI);
+        const mongoDb = await mongoConnection();
         const gameDetails = await queryDatabaseForGameCode(mongoDb, gameCode);
         if (gameDetails.statusCode) {
             //Don't register user
@@ -46,41 +44,20 @@ async function join(event, context, callback) {
                 },
                 context
             );
-            let processedGameState = {};
-            let foundUser = gameDetails.players.filter(player => player.playerId == userId);
-            if (foundUser < 1) {
-                //If the user doesn't exist in the game yet, register them.
-                gameDetails.players.push({ playerId: userId, totalPoints: 0, answers: [] });
-                try {
-                    let addedUser = await updateGameDetails(mongoDb, gameDetails);
-                    processedGameState = processGameState(gameDetails);
-                    wsClient.send(event.requestContext.connectionId, {
-                        event: "game-status",
-                        channelId: body.channelId,
-                        processedGameState
-                    });
-                } catch (error) {
-                    reject({ mongoMessage: error.message, message: "Error: failed to update user." });
-                }
-            } else {
-                //If the user exists, return the game
-                processedGameState = processGameState(gameDetails);
-                console.log('=> GAME STATE ABOUT TO REQUEST');
-                try {
-                    wsClient.send(event, {
-                        event: "game-status",
-                        channelId: body.channelId,
-                        processedGameState
-                    });
-                }catch(error){
-                    console.log('=> ERROR CALLING');
-                    console.log(error);
-                }
+
+            const gameStatusForUser = await getGameStatus(gameDetails, userId);
+            try {
+                return wsClient.send(event, {
+                    event: "game-status",
+                    channelId: body.channelId,
+                    gameStatusForUser
+                });
+               
+            }catch(error){
+                console.log('=> ERROR CALLING');
+                console.log(error);
             }
         }
-
-
-
     } catch (err) {
         console.error(err);
     }
@@ -89,89 +66,32 @@ async function join(event, context, callback) {
 
 }
 
-async function subscribeChannel(event, context) {
-    const channelId = JSON.parse(event.body).channelId;
-    await db.Client.put({
-        TableName: db.Table,
-        Item: {
-            [db.Channel.Connections.Key]: `${db.Channel.Prefix}${channelId}`,
-            [db.Channel.Connections.Range]: `${db.Connection.Prefix}${
-                db.parseEntityId(event)
-                }`
-        }
-    }).promise();
-
-    // Instead of broadcasting here we listen to the dynamodb stream
-    // just a fun example of flexible usage
-    // you could imagine bots or other sub systems broadcasting via a write the db
-    // and then streams does the rest
-    return success;
-}
-
-
-function connectToDatabase(uri) {
-    return new Promise((resolve, reject) => {
-        if (cachedDb) {
-            resolve(cachedDb);
-        }
-
-        MongoClient.connect(uri, function (err, mongoDb) {
-            if (err) {
-                console.log(err);
-                reject(err);
-
-
-            } else {
-                // let connection = mongoDb.db('noggle-boggle-trivia-dev');
-                console.log('=> connectingNonCached to database');
-                cachedDb = mongoDb.db('noggle-boggle-trivia-dev');;
-                resolve(cachedDb);
+async function getGameStatus(gameDetails, userId){
+    if (gameDetails.statusCode) {
+        //Don't register user
+    } else {
+        //Subscribe to the channel
+        let processedGameState = {};
+        let foundUser = gameDetails.players.filter(player => player.playerId == userId);
+        if (foundUser < 1) {
+            //If the user doesn't exist in the game yet, register them.
+            gameDetails.players.push({ playerId: userId, totalPoints: 0, answers: [] });
+            try {
+                let addedUser = await updateGameDetails(mongoDb, gameDetails);
+                processedGameState = processGameState(gameDetails);
+                return processedGameState;
+                
+            } catch (error) {
+                console.log('=>error 1')
+                console.log(error)
+                reject({ mongoMessage: error.message, message: "Error: failed to update user." });
             }
-        });
-    });
-    // return MongoClient.connect(uri)
-    //     .then(db => {
-    // console.log('=> connectingNonCached to database');
-    // cachedDb = db;
-    // return cachedDb;
-    //     });
-}
-var ObjectId = require('mongodb').ObjectId;
-
-convertToObjectId = (idString) => {
-    try {
-        return (new ObjectId(idString));
-    } catch (error) {
-        console.log(error);
+        } else {
+            //If the user exists, return the game
+            processedGameState = processGameState(gameDetails);
+            return processedGameState;
+        }
     }
-}
-
-function queryDatabaseForGameCode(mongoDb, gameId) {
-
-    return mongoDb.collection('games').findOne({ _id: convertToObjectId(gameId) })
-        .then((gameDetail) => {
-            if (gameDetail == null) {
-                return { statusCode: 400, message: "Game not found." };
-            }
-            return gameDetail;
-        })
-        .catch(error => {
-            console.log('=> an error occurred: ', err);
-            return { statusCode: 500, message: "There was an error accessing the games collection for pulling game details." };
-        });
-}
-
-
-function updateGameDetails(mongoDb, gameDetails) {
-    console.log('=> updating database');
-
-    return mongoDb.collection('games').updateOne({ _id: gameDetails._id }, { $set: { players: gameDetails.players } })
-        .then((gameDetail) => {
-            return true;
-        })
-        .catch(error => {
-            return { statusCode: 500, message: "There was an error updating the games collection for adding the player" };
-        });
 }
 
 function processGameState(gameDetails) {
@@ -195,6 +115,53 @@ function processGameState(gameDetails) {
 
         }
     }
+}
+
+
+async function subscribeChannel(event, context) {
+    const channelId = JSON.parse(event.body).channelId;
+    await db.Client.put({
+        TableName: db.Table,
+        Item: {
+            [db.Channel.Connections.Key]: `${db.Channel.Prefix}${channelId}`,
+            [db.Channel.Connections.Range]: `${db.Connection.Prefix}${
+                db.parseEntityId(event)
+                }`
+        }
+    }).promise();
+
+    // Instead of broadcasting here we listen to the dynamodb stream
+    // just a fun example of flexible usage
+    // you could imagine bots or other sub systems broadcasting via a write the db
+    // and then streams does the rest
+    return success;
+}
+
+
+
+var ObjectId = require('mongodb').ObjectId;
+
+convertToObjectId = (idString) => {
+    try {
+        return (new ObjectId(idString));
+    } catch (error) {
+        console.log(error);
+    }
+}
+
+function queryDatabaseForGameCode(mongoDb, gameId) {
+
+    return mongoDb.collection('games').findOne({ _id: convertToObjectId(gameId) })
+        .then((gameDetail) => {
+            if (gameDetail == null) {
+                return { statusCode: 400, message: "Game not found." };
+            }
+            return gameDetail;
+        })
+        .catch(error => {
+            console.log('=> an error occurred: ', err);
+            return { statusCode: 500, message: "There was an error accessing the games collection for pulling game details." };
+        });
 }
 
 

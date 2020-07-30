@@ -58,7 +58,6 @@ class Client {
         // Cheat and allow event to be passed in
         // this also lets us default to setupClient too
         await this._setupClient(connection)
-
         let ConnectionId = connection;
         if(typeof connection === 'object'){
             ConnectionId = connection.requestContext.connectionId;

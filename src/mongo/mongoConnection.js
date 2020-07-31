@@ -1,5 +1,6 @@
 const MongoClient = require('mongodb').MongoClient;
-const MONGODB_URI = ''
+const MONGODB_URI = '';
+
 let cachedDb = null;
 
 function connectToDatabase() {

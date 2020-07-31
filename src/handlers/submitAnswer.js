@@ -29,62 +29,65 @@ async function submit(event, context, callback) {
     const userId = body.userId;
     const gameId = body.gameId;
     const questionSubmission = payload;
-    try {    
+    try {
         const mongoDb = await mongoConnection();
         const gameDetails = await getGameDetails(mongoDb, gameId);
         if (doesUserExistInGame(gameDetails, userId)) {
             //If the user doesn't exist in the game yet, reject
             //Build response and fail
-            
+
             // reject({ message: 'User is not part of game, please join the game' });
-        }else {
+        } else {
             if (gameDetails.questionDetail.currentQuestion != questionSubmission.questionId) {
                 //Build response and fail
-
+                let message = "The question submitted is not the current active question. Please wait for the next question."
+                let response = {"status":"error", "message": message}
+                return wsClient.send(event, {
+                    event: "game-status",
+                    channelId: body.channelId,
+                    response
+                });
                 // reject('This is not the current question for this game.');
             } else if (questionPreviouslyAnsweredByUser(gameDetails, userId, questionSubmission.questionId)) {
-                            //Build response and fail
-
+                //Build response and fail
+                let message = "You have previously answered the question. Please wait for the next question."
+                let response = {"status":"error", "message": message}
+                return wsClient.send(event, {
+                    event: "game-status",
+                    channelId: body.channelId,
+                    response
+                });
                 // reject('This question has been previously answered by the user.');
             } else {
                 let playerUpdateObject = buildGameDetailForUserAnswerUpdate(gameDetails, userId, questionSubmission);
-                submitAnswerToDataBase(mongoDb, gameId, playerUpdateObject).then((result) => {
-                    console.log('=> MADE IT EHRE!')
-                    return wsClient.send(event, {
-                        event: "game-status",
-                        channelId: gameId,
-                        result
-                    });
-                }).catch((error) => {
-                    console.log('=> ERROR ');
-                    console.log(error);
-                    // reject({ message: "Failed to submit answer." });
-                })
+                let storageResult = await submitAnswerToDataBase(mongoDb, gameId, playerUpdateObject);
+                let response = {"status":"success", "message": storageResult.message}
+                return wsClient.send(event, {
+                    event: "game-status",
+                    channelId: body.channelId,
+                    response
+                });
+
 
             }
         }
-
-        //Get the game detail
-            //Check if user exists in game
-                //if not, reject
-                //if they do
-                    //check the question hasn't been previously answered
-                    //check if question is the current question
-                    //otherwise, build the user update and submit the new data
-        // const result = await insertUser(db, email);
-        // console.log("Mongo insert succeeded", result);
-        return success;
-      } catch(err) {
+    } catch (err) {
         console.error(err);
-      }
+        let response = {"status":"error","message":"There was an error submitting your answer, please try again. If this issue continues, please contact your game master."}
+        return wsClient.send(event, {
+            event: "game-status",
+            channelId: body.channelId,
+            response
+        });
+    }
 }
 
-function doesUserExistInGame(gameDetails, userId){
+function doesUserExistInGame(gameDetails, userId) {
     let foundUser = gameDetails.players.filter(player => player.playerId == userId);
     return foundUser > 1;
 }
 
-function questionPreviouslyAnsweredByUser(gameDetails, userId, submittedId){
+function questionPreviouslyAnsweredByUser(gameDetails, userId, submittedId) {
     let playerDetails = gameDetails.players.filter((playerDetail) => playerDetail.playerId == userId)[0];
     if (playerDetails.answers.filter((answer) => answer.questionId == submittedId).length > 0) {
         return true;
@@ -93,7 +96,7 @@ function questionPreviouslyAnsweredByUser(gameDetails, userId, submittedId){
     }
 }
 
-function buildGameDetailForUserAnswerUpdate(gameDetails, userId, submittedAnswer){
+function buildGameDetailForUserAnswerUpdate(gameDetails, userId, submittedAnswer) {
     //Check if answer is right and build accordingly.
     let gameDetailQuestion = gameDetails.questionDetail.questions.find((question) => question.questionId == submittedAnswer.questionId);
     let playerDetails = gameDetails.players.find((player) => player.playerId === userId);

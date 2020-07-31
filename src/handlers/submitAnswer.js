@@ -7,6 +7,8 @@ const sanitize = require("sanitize-html");
 const mongoConnection = require('../mongo/mongoConnection').connectToDatabase;
 const getGameDetails = require('../mongo/mongoActions').queryDatabaseForGameCode;
 const submitAnswerToDataBase = require('../mongo/mongoActions').submitAnswerToDataBase;
+const incrementQuestion = require('../mongo/mongoActions').incrementQuestion;
+
 let cachedDb = null;
 const wsClient = new ws.Client();
 
@@ -82,6 +84,35 @@ async function submit(event, context, callback) {
     }
 }
 
+async function nextQuestion(event, context, callback) {
+
+
+    // {"questionId":0, "answer":1, "type": "multipleChoice"}
+    const body = JSON.parse(event.body);
+    const payload = body.payload;
+    const userId = body.userId;
+    const gameId = body.gameId;
+    const questionSubmission = payload;
+    try {
+        const mongoDb = await mongoConnection();
+        const incrementStatus = await incrementQuestion(mongoDb, gameId);
+        return wsClient.send(event, {
+            event: "game-status",
+            channelId: body.channelId,
+            incrementStatus
+        });
+    } catch (err) {
+        console.error(err);
+        let response = {"status":"error","message":"There was an error incrementing the question, please try again."}
+        return wsClient.send(event, {
+            event: "game-status",
+            channelId: body.channelId,
+            response
+        });
+    }
+}
+
+
 function doesUserExistInGame(gameDetails, userId) {
     let foundUser = gameDetails.players.filter(player => player.playerId == userId);
     return foundUser > 1;
@@ -121,7 +152,8 @@ function buildGameDetailForUserAnswerUpdate(gameDetails, userId, submittedAnswer
 }
 
 module.exports = {
-    submit
+    submit,
+    nextQuestion
 };
 
 

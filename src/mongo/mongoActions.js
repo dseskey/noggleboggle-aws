@@ -30,10 +30,10 @@ function addUserToGame(mongoDb, gameDetails) {
 
         try {
             gamesCollection.updateOne({ _id: gameDetails._id }, { $set: { players: gameDetails.players } });
-            resolve({status:"success",message:"The user was added to the game successfully."});
+            resolve({ status: "success", message: "The user was added to the game successfully." });
         } catch (error) {
             console.log(error)
-            reject({ status:"error", message: 'There was an error accessing the games collection for updating game details.', error: error });
+            reject({ status: "error", message: 'There was an error accessing the games collection for updating game details.', error: error });
         }
     })
 
@@ -56,9 +56,26 @@ function submitAnswerToDataBase(mongoDb, gameId, playerDetail) {
 };
 
 
+function incrementQuestion(mongoDb, gameId) {
+    return new Promise((resolve, reject) => {
+        let gamesCollection = mongoDb.collection('games');
+
+        gamesCollection.findOneAndUpdate({ _id: convertToObjectId(gameId) }, { $inc: { "questionDetail.currentQuestion": 1 } }).then((gameResult) => {
+            console.log('=>Increment status');
+            console.log(gameResult);
+            resolve({ status: "success", message: "Question Succesfully incremented. " })
+        }).catch(error => {
+            reject({ status: "error", message: 'There was an error incrementing the question.', error: error });
+        });
+
+    });
+}
+
+
 
 module.exports = {
     queryDatabaseForGameCode,
     submitAnswerToDataBase,
-    addUserToGame
+    addUserToGame,
+    incrementQuestion
 }

@@ -80,12 +80,12 @@ functions:
       - websocket:
           route: joinGame
 
-  # gameStatus
-  # gameStatus:
-  #   handler: src/handlers/game.currentGameStatus
-  #   events:
-  #     - websocket:
-  #         route: currentGameStatus
+  # nextQuestion
+  nextQuestion:
+    handler: src/handlers/nextQuestion.next
+    events:
+      - websocket:
+          route: nextQuestion
 
 
   # Channel Subscriptions

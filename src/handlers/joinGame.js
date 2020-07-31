@@ -5,6 +5,7 @@ const ws = require("../websocket-client");
 const sanitize = require("sanitize-html");
 const mongoConnection = require('../mongo/mongoConnection').connectToDatabase;
 const processGameState = require('../utilities').processGameState;
+const addUserToGame = require('../mongo/mongoActions').addUserToGame;
 
 "use strict";
 
@@ -46,7 +47,7 @@ async function join(event, context, callback) {
                 context
             );
 
-            const gameStatusForUser = await getGameStatus(gameDetails, userId);
+            const gameStatusForUser = await getGameStatus(mongoDb, gameDetails, userId);
             try {
                 return wsClient.send(event, {
                     event: "game-status",
@@ -67,7 +68,7 @@ async function join(event, context, callback) {
 
 }
 
-async function getGameStatus(gameDetails, userId){
+async function getGameStatus(mongoDb, gameDetails, userId){
     if (gameDetails.statusCode) {
         //Don't register user
     } else {
@@ -78,14 +79,16 @@ async function getGameStatus(gameDetails, userId){
             //If the user doesn't exist in the game yet, register them.
             gameDetails.players.push({ playerId: userId, totalPoints: 0, answers: [] });
             try {
-                let addedUser = await updateGameDetails(mongoDb, gameDetails);
+                let addUserStatus = await addUserToGame(mongoDb, gameDetails);
+                console.log("=> ADD USER");
+                console.log(addUserStatus);
                 processedGameState = processGameState(gameDetails);
                 return processedGameState;
                 
             } catch (error) {
                 console.log('=>error 1')
                 console.log(error)
-                reject({ mongoMessage: error.message, message: "Error: failed to update user." });
+                return {"status": "error", "message":"There was an error adding you to the game. Please try again."} 
             }
         } else {
             //If the user exists, return the game

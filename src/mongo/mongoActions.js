@@ -23,6 +23,23 @@ function queryDatabaseForGameCode(mongoDb, gameId) {
         });
 }
 
+function addUserToGame(mongoDb, gameDetails) {
+
+    return new Promise((resolve, reject) => {
+        let gamesCollection = mongoDb.collection('games');
+
+        try {
+            gamesCollection.updateOne({ _id: gameDetails._id }, { $set: { players: gameDetails.players } });
+            resolve({status:"success",message:"The user was added to the game successfully."});
+        } catch (error) {
+            console.log(error)
+            reject({ status:"error", message: 'There was an error accessing the games collection for updating game details.', error: error });
+        }
+    })
+
+};
+
+
 function submitAnswerToDataBase(mongoDb, gameId, playerDetail) {
     return new Promise((resolve, reject) => {
         let gamesCollection = mongoDb.collection('games');
@@ -42,5 +59,6 @@ function submitAnswerToDataBase(mongoDb, gameId, playerDetail) {
 
 module.exports = {
     queryDatabaseForGameCode,
-    submitAnswerToDataBase
+    submitAnswerToDataBase,
+    addUserToGame
 }

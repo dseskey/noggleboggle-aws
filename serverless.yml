@@ -87,7 +87,20 @@ functions:
       - websocket:
           route: nextQuestion
 
+  # showScoreboard
+  showScoreboard:
+    handler: src/handlers/showScoreboard.show
+    events:
+      - websocket:
+          route: showScoreboard
 
+  # startGame
+  startGame:
+    handler: src/handlers/startGame.start
+    events:
+      - websocket:
+          route: startGame
+  
   # Channel Subscriptions
   channelManager:
     handler: src/handler.channelManager

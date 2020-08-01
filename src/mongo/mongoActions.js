@@ -77,10 +77,54 @@ function incrementQuestion(mongoDb, gameId) {
 }
 
 
+function getDetailsForScoreboard(mongoDb, gameId) {
+    return new Promise((resolve, reject) => {
+        let gamesCollection = mongoDb.collection('games');
+        let usersCollection = mongoDb.collection('users');
+
+        gamesCollection.findOne({ _id: convertToObjectId(gameId) }).then((game) => {
+            let usersInGameWithScore = game.players.map((player) => {
+                return { playerId: player.playerId, totalPoints: player.totalPoints }
+            })
+
+            usersCollection.find({ _id: { $in: game.players.map(player => convertToObjectId(player.playerId)) } }).project({ _id: 1, displayName: 1 }).toArray((err, users) => {
+                if (err) {
+                    reject({ message: 'There was an error getting the users for scoreboard.', error: error });
+                }
+                resolve({ usersFromDb: users, playersAndScores: usersInGameWithScore })
+            });
+
+        }).catch(error => {
+            reject({ status: "error", message: 'Could not get the game to generate the scoreboard.', error: error });
+        });
+    })
+};
+
+function openGame(mongoDb, gameId) {
+    return new Promise((resolve, reject) => {
+        let gamesCollection = mongoDb.collection('games');
+
+        /*--Get collection and grab question list and current question, see if we have more questions--*/
+        try {
+            gamesCollection.findOneAndUpdate({ _id: convertToObjectId(gameId) }, { $set: { isOpen: true, isStarted: true } }).then((gameResult) => {
+                let question = gameResult.value.questionDetail.questions[gameResult.value.questionDetail.currentQuestion];
+                delete question.answerId;
+                resolve({ status: "CONTINUE", question: question });
+
+            }).catch((error) => {
+                reject({ message: 'There was an error accessing the games collection for starting the game.', error: error });
+            });
+        } catch (error) {
+            reject({ message: 'There was an error accessing the games collection for  starting the game with the given ID', error: error });
+        }
+    });
+}
 
 module.exports = {
     queryDatabaseForGameCode,
     submitAnswerToDataBase,
     addUserToGame,
-    incrementQuestion
+    incrementQuestion,
+    getDetailsForScoreboard,
+    openGame
 }

@@ -30,11 +30,38 @@ async function join(event, context, callback) {
     //Get Collection to validate game code.
     //If user is in game, return the game details for the question, else add, update the game details, and return the game
     try {
-        const mongoDb = await mongoConnection();
+        var mongoDb;
+        try {
+            mongoDb = await mongoConnection();
+        } catch (error) {
+            let message = "Error connecting to the game database."
+            console.log('==> Error connecting to MongoDb: ' + JSON.stringify(error));
+            return wsClient.send(event, {
+                event: "game-status-error",
+                channelId: body.channelId,
+                message
+            });
+        }
         const gameDetails = await queryDatabaseForGameCode(mongoDb, gameCode);
         if (gameDetails.statusCode) {
-            //Don't register user
-        } else {
+            if (gameDetails.statusCode == 400) {
+                let message = "Could not find a game with the provided game code.";
+                return wsClient.send(event, {
+                    event: "game-status-error",
+                    channelId: body.channelId,
+                    message
+                });
+
+            } else {
+                let message = "There was an error trying to load the game. Please try again later.";
+                return wsClient.send(event, {
+                    event: "game-status-error",
+                    channelId: body.channelId,
+                    message
+                });
+            }
+        }
+        else {
             //Subscribe to the channel
             await subscribeChannel(
                 {
@@ -47,17 +74,32 @@ async function join(event, context, callback) {
                 context
             );
 
-            const gameStatusForUser = await getGameStatus(mongoDb, gameDetails, userId);
+            var gameStatusForUser;
             try {
-                return wsClient.send(event, {
-                    event: "game-status",
-                    channelId: body.channelId,
-                    gameStatusForUser
-                });
-               
-            }catch(error){
-                console.log('=> ERROR CALLING');
+                gameStatusForUser = await getGameStatus(mongoDb, gameDetails, userId);
+                if (gameStatusForUser.status) {
+                    let message = gameStatusForUser.message;
+                    return wsClient.send(event, {
+                        event: "game-status-error",
+                        channelId: body.channelId,
+                        message
+                    });
+                } else {
+                    return wsClient.send(event, {
+                        event: "game-status-success",
+                        channelId: body.channelId,
+                        gameStatusForUser
+                    });
+                }
+            } catch (error) {
+                console.log('=> ERROR GETTING GAME');
                 console.log(error);
+                let message = error.message;
+                return wsClient.send(event, {
+                    event: "game-status-error",
+                    channelId: body.channelId,
+                    message
+                });
             }
         }
     } catch (err) {
@@ -68,34 +110,30 @@ async function join(event, context, callback) {
 
 }
 
-async function getGameStatus(mongoDb, gameDetails, userId){
-    if (gameDetails.statusCode) {
-        //Don't register user
-    } else {
-        //Subscribe to the channel
-        let processedGameState = {};
-        let foundUser = gameDetails.players.filter(player => player.playerId == userId);
-        if (foundUser < 1) {
-            //If the user doesn't exist in the game yet, register them.
-            gameDetails.players.push({ playerId: userId, totalPoints: 0, answers: [] });
-            try {
-                let addUserStatus = await addUserToGame(mongoDb, gameDetails);
-                console.log("=> ADD USER");
-                console.log(addUserStatus);
-                processedGameState = processGameState(gameDetails);
-                return processedGameState;
-                
-            } catch (error) {
-                console.log('=>error 1')
-                console.log(error)
-                return {"status": "error", "message":"There was an error adding you to the game. Please try again."} 
-            }
-        } else {
-            //If the user exists, return the game
+async function getGameStatus(mongoDb, gameDetails, userId) {
+
+    //Subscribe to the channel
+    let processedGameState = {};
+    let foundUser = gameDetails.players.filter(player => player.playerId == userId);
+    if (foundUser < 1) {
+        //If the user doesn't exist in the game yet, register them.
+        gameDetails.players.push({ playerId: userId, totalPoints: 0, answers: [] });
+        try {
+            let addUserStatus = await addUserToGame(mongoDb, gameDetails);
             processedGameState = processGameState(gameDetails);
             return processedGameState;
+
+        } catch (error) {
+            console.log('=>error 1')
+            console.log(error)
+            return { "status": "error", "message": "There was an error adding you to the game. Please try again." };
         }
+    } else {
+        //If the user exists, return the game
+        processedGameState = processGameState(gameDetails);
+        return processedGameState;
     }
+
 }
 
 async function subscribeChannel(event, context) {

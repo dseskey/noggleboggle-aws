@@ -43,31 +43,29 @@ async function submit(event, context, callback) {
             if (gameDetails.questionDetail.currentQuestion != questionSubmission.questionId) {
                 //Build response and fail
                 let message = "The question submitted is not the current active question. Please wait for the next question."
-                let response = {"status":"error", "message": message}
                 return wsClient.send(event, {
-                    event: "game-status",
+                    event: "game-status-error",
                     channelId: body.channelId,
-                    response
+                    message
                 });
                 // reject('This is not the current question for this game.');
             } else if (questionPreviouslyAnsweredByUser(gameDetails, userId, questionSubmission.questionId)) {
                 //Build response and fail
                 let message = "You have previously answered the question. Please wait for the next question."
-                let response = {"status":"error", "message": message}
                 return wsClient.send(event, {
-                    event: "game-status",
+                    event: "game-status-error",
                     channelId: body.channelId,
-                    response
+                    message
                 });
                 // reject('This question has been previously answered by the user.');
             } else {
                 let playerUpdateObject = buildGameDetailForUserAnswerUpdate(gameDetails, userId, questionSubmission);
                 let storageResult = await submitAnswerToDataBase(mongoDb, gameId, playerUpdateObject);
-                let response = {"status":"success", "message": storageResult.message}
+                let message = storageResult.message;
                 return wsClient.send(event, {
                     event: "game-status",
                     channelId: body.channelId,
-                    response
+                    message
                 });
 
 
@@ -75,11 +73,11 @@ async function submit(event, context, callback) {
         }
     } catch (err) {
         console.error(err);
-        let response = {"status":"error","message":"There was an error submitting your answer, please try again. If this issue continues, please contact your game master."}
+        let message = "There was an error submitting your answer, please try again. If this issue continues, please contact your game master."
         return wsClient.send(event, {
-            event: "game-status",
+            event: "game-status-error",
             channelId: body.channelId,
-            response
+            message
         });
     }
 }

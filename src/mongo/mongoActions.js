@@ -61,8 +61,13 @@ function incrementQuestion(mongoDb, gameId) {
         let gamesCollection = mongoDb.collection('games');
 
         gamesCollection.findOneAndUpdate({ _id: convertToObjectId(gameId) }, { $inc: { "questionDetail.currentQuestion": 1 } }).then((gameResult) => {
-            console.log('=>Increment status');
-            console.log(gameResult);
+            if (gameResult.value.questionDetail.currentQuestion + 1 < gameResult.value.questionDetail.questions.length) {
+                let nextQuestion = gameResult.value.questionDetail.questions[gameResult.value.questionDetail.currentQuestion + 1];
+                delete nextQuestion.answerId;
+                resolve({ status: "CONTINUE", question: nextQuestion });
+            } else {
+                resolve({ status: "END", message: "End of Game" })
+            }
             resolve({ status: "success", message: "Question Succesfully incremented. " })
         }).catch(error => {
             reject({ status: "error", message: 'There was an error incrementing the question.', error: error });

@@ -29,18 +29,24 @@ async function next(event, context, callback) {
     try {
         const mongoDb = await mongoConnection();
         const incrementStatus = await incrementQuestion(mongoDb, gameId);
+        let payload;
+        if(incrementStatus.status == "CONTINUE"){
+            payload = {"status": incrementStatus.status, "question": incrementStatus.question}
+        }else{
+            payload = {"status": incrementStatus.status, "message": incrementStatus.message}
+        }
         return wsClient.send(event, {
-            event: "game-status",
+            event: "game-status-success",
             channelId: body.channelId,
-            incrementStatus
+            payload
         });
     } catch (err) {
         console.error(err);
-        let response = {"status":"error","message":"There was an error incrementing the question, please try again."}
+        let message = "There was an error incrementing the question, please try again."
         return wsClient.send(event, {
-            event: "game-status",
+            event: "game-status-error",
             channelId: body.channelId,
-            response
+            message
         });
     }
 }

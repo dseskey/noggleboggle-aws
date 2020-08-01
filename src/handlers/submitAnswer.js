@@ -8,6 +8,7 @@ const mongoConnection = require('../mongo/mongoConnection').connectToDatabase;
 const getGameDetails = require('../mongo/mongoActions').queryDatabaseForGameCode;
 const submitAnswerToDataBase = require('../mongo/mongoActions').submitAnswerToDataBase;
 const incrementQuestion = require('../mongo/mongoActions').incrementQuestion;
+const getGameIdFromConnection =  require('../utilities').getGameIdFromConnection;
 
 let cachedDb = null;
 const wsClient = new ws.Client();
@@ -29,9 +30,21 @@ async function submit(event, context, callback) {
     const body = JSON.parse(event.body);
     const payload = body.payload;
     const userId = body.userId;
-    const gameId = body.gameId;
     const questionSubmission = payload;
     try {
+        let gameId;
+        const gameIdFromConnectionResult = await getGameIdFromConnection(event);
+        if(gameIdFromConnectionResult.status == 'error'){
+            let message= gameIdFromConnectionResult.message;
+
+            return wsClient.send(event, {
+                event: "game-status-error",
+                channelId: body.channelId,
+                message
+            });
+        }else{
+            gameId = gameIdFromConnectionResult.gameId;
+        }
         const mongoDb = await mongoConnection();
         const gameDetails = await getGameDetails(mongoDb, gameId);
         if (doesUserExistInGame(gameDetails, userId)) {

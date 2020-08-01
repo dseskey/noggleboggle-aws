@@ -6,6 +6,7 @@ const sanitize = require("sanitize-html");
 const mongoConnection = require('../mongo/mongoConnection').connectToDatabase;
 const processGameState = require('../utilities').processGameState;
 const addUserToGame = require('../mongo/mongoActions').addUserToGame;
+const getGameIdFromConnection =  require('../utilities').getGameIdFromConnection;
 
 "use strict";
 
@@ -21,7 +22,7 @@ const fail500 = {
 
 
 async function join(event, context, callback) {
-
+    
     const body = JSON.parse(event.body);
     let gameCode = body.payload.gameId;
     let userId = body.payload.userId; //Note this will be replaced with cognito

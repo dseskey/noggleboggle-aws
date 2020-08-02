@@ -4,8 +4,11 @@ const db = require("../db");
 const ws = require("../websocket-client");
 const sanitize = require("sanitize-html");
 "use strict";
-const MongoClient = require('mongodb').MongoClient;
-const MONGODB_URI = ''; 
+const mongoConnection = require('../mongo/mongoConnection').connectToDatabase;
+const getGameDetails = require('../mongo/mongoActions').queryDatabaseForGameCode;
+const submitAnswerToDataBase = require('../mongo/mongoActions').submitAnswerToDataBase;
+const incrementQuestion = require('../mongo/mongoActions').incrementQuestion;
+const getGameIdFromConnection =  require('../utilities').getGameIdFromConnection;
 
 let cachedDb = null;
 const wsClient = new ws.Client();
@@ -20,97 +23,148 @@ const fail500 = {
 
 
 
-function connectToDatabase (uri) {
-    console.log('Connect to mongo database');
-
-    if (cachedDb) {
-        console.log('Using cached database instance');
-        return Promise.resolve(cachedDb);
-    }
-
-    return MongoClient.connect(MONGODB_URI)
-        .then(db => {
-            console.log('Successful connect');
-            cachedDb = db;
-            return cachedDb;
-        }).catch(err => {
-            console.log('Connection error occurred: ', err);
-            callback(err);
-        });
-}
-
-
 async function submit(event, context, callback) {
 
 
     // {"questionId":0, "answer":1, "type": "multipleChoice"}
     const body = JSON.parse(event.body);
     const payload = body.payload;
+    const userId = body.userId;
+    const questionSubmission = payload;
+    try {
+        let gameId;
+        const gameIdFromConnectionResult = await getGameIdFromConnection(event);
+        if(gameIdFromConnectionResult.status == 'error'){
+            let message= gameIdFromConnectionResult.message;
 
-    try {    
-        console.log('=> preparing to connect to db')
-        const mongoDb = await connectToDatabase(MONGODB_URI);
-        console.log("Mongo connected");
-        const userData = await queryDatabase(mongoDb);
-        console.log('+> RETURNING DATA');
-        console.log(userData);
-        // const result = await insertUser(db, email);
-        // console.log("Mongo insert succeeded", result);
-        return success;
-      } catch(err) {
-        console.error(err);
-      }
-}
-
-
-function connectToDatabase(uri) {
-    return new Promise((resolve,reject) => {
-        if (cachedDb) {
-            console.log('=> using cached database instance');
-            resolve(cachedDb);
+            return wsClient.send(event, {
+                event: "game-status-error",
+                channelId: body.channelId,
+                message
+            });
+        }else{
+            gameId = gameIdFromConnectionResult.gameId;
         }
-    
-        MongoClient.connect('', function (err, mongoDb) {
-            if (err) {
-                console.log('ERRORORS');
-                console.log(err);
-                reject(err);
-    
-    
+        const mongoDb = await mongoConnection();
+        const gameDetails = await getGameDetails(mongoDb, gameId);
+        if (doesUserExistInGame(gameDetails, userId)) {
+            //If the user doesn't exist in the game yet, reject
+            //Build response and fail
+
+            // reject({ message: 'User is not part of game, please join the game' });
+        } else {
+            if (gameDetails.questionDetail.currentQuestion != questionSubmission.questionId) {
+                //Build response and fail
+                let message = "The question submitted is not the current active question. Please wait for the next question."
+                return wsClient.send(event, {
+                    event: "game-status-error",
+                    channelId: body.channelId,
+                    message
+                });
+                // reject('This is not the current question for this game.');
+            } else if (questionPreviouslyAnsweredByUser(gameDetails, userId, questionSubmission.questionId)) {
+                //Build response and fail
+                let message = "You have previously answered the question. Please wait for the next question."
+                return wsClient.send(event, {
+                    event: "game-status-error",
+                    channelId: body.channelId,
+                    message
+                });
+                // reject('This question has been previously answered by the user.');
             } else {
-                console.log('hihihih')
-                // let connection = mongoDb.db('noggle-boggle-trivia-dev');
-                console.log('=> connectingNonCached to database');
-                cachedDb = mongoDb.db('noggle-boggle-trivia-dev');;
-                resolve(cachedDb);
+                let playerUpdateObject = buildGameDetailForUserAnswerUpdate(gameDetails, userId, questionSubmission);
+                let storageResult = await submitAnswerToDataBase(mongoDb, gameId, playerUpdateObject);
+                let message = storageResult.message;
+                return wsClient.send(event, {
+                    event: "game-status",
+                    channelId: body.channelId,
+                    message
+                });
+
+
             }
+        }
+    } catch (err) {
+        console.error(err);
+        let message = "There was an error submitting your answer, please try again. If this issue continues, please contact your game master."
+        return wsClient.send(event, {
+            event: "game-status-error",
+            channelId: body.channelId,
+            message
         });
-    });
-    // return MongoClient.connect(uri)
-    //     .then(db => {
-            // console.log('=> connectingNonCached to database');
-            // cachedDb = db;
-            // return cachedDb;
-    //     });
+    }
 }
 
-function queryDatabase(mongoDb) {
-    console.log('=> query database');
+async function nextQuestion(event, context, callback) {
 
-    return mongoDb.collection('users').find({}).toArray()
-        .then((users) => { 
-            console.log("=> USERS");
-            return { statusCode: 200, body: users }; 
-        })
-        .catch(err => {
-            console.log('=> an error occurred: ', err);
-            return { statusCode: 500, body: 'error' };
+
+    // {"questionId":0, "answer":1, "type": "multipleChoice"}
+    const body = JSON.parse(event.body);
+    const payload = body.payload;
+    const userId = body.userId;
+    const gameId = body.gameId;
+    const questionSubmission = payload;
+    try {
+        const mongoDb = await mongoConnection();
+        const incrementStatus = await incrementQuestion(mongoDb, gameId);
+        return wsClient.send(event, {
+            event: "game-status",
+            channelId: body.channelId,
+            incrementStatus
         });
+    } catch (err) {
+        console.error(err);
+        let response = {"status":"error","message":"There was an error incrementing the question, please try again."}
+        return wsClient.send(event, {
+            event: "game-status",
+            channelId: body.channelId,
+            response
+        });
+    }
 }
 
+
+function doesUserExistInGame(gameDetails, userId) {
+    let foundUser = gameDetails.players.filter(player => player.playerId == userId);
+    return foundUser > 1;
+}
+
+function questionPreviouslyAnsweredByUser(gameDetails, userId, submittedId) {
+    let playerDetails = gameDetails.players.filter((playerDetail) => playerDetail.playerId == userId)[0];
+    if (playerDetails.answers.filter((answer) => answer.questionId == submittedId).length > 0) {
+        return true;
+    } else {
+        return false;
+    }
+}
+
+function buildGameDetailForUserAnswerUpdate(gameDetails, userId, submittedAnswer) {
+    //Check if answer is right and build accordingly.
+    let gameDetailQuestion = gameDetails.questionDetail.questions.find((question) => question.questionId == submittedAnswer.questionId);
+    let playerDetails = gameDetails.players.find((player) => player.playerId === userId);
+    let userAnswer = {};
+    userAnswer.questionId = submittedAnswer.questionId;
+    userAnswer.answer = submittedAnswer.answer;
+    if (gameDetailQuestion.type === 'multipleChoice') {
+        if (gameDetailQuestion.answerId == submittedAnswer.answer) {
+            userAnswer.pointsAwarded = gameDetailQuestion.pointsAvailable;
+            playerDetails.answers.push(userAnswer);
+            playerDetails.totalPoints = playerDetails.totalPoints + gameDetailQuestion.pointsAvailable;
+        } else {
+            userAnswer.pointsAwarded = 0;
+            playerDetails.answers.push(userAnswer);
+            playerDetails.totalPoints = playerDetails.totalPoints + 0;
+        }
+    } else {
+
+    }
+    return playerDetails;
+
+}
 
 module.exports = {
-    submit
+    submit,
+    nextQuestion
 };
 
 

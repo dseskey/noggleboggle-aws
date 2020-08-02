@@ -14,17 +14,22 @@ async function connectionManager(event, context) {
   await wsClient._setupClient(event);
 
   if (event.requestContext.eventType === "CONNECT") {
+    console.log('=> event');
+    console.log(event);
+    console.log('=> context');
+
+    console.log(context);
     // sub general channel
-    await subscribeChannel(
-      {
-        ...event,
-        body: JSON.stringify({
-          action: "subscribe",
-          channelId: "General"
-        })
-      },
-      context
-    );
+    // await subscribeChannel(
+    //   {
+    //     ...event,
+    //     body: JSON.stringify({
+    //       action: "subscribe",
+    //       channelId: "General"
+    //     })
+    //   },
+    //   context
+    // );
 
     return success;
   } else if (event.requestContext.eventType === "DISCONNECT") {
@@ -93,7 +98,7 @@ async function sendMessage(event, context) {
       subscriber[db.Channel.Connections.Range]
     );
     return wsClient.send(subscriberId, {
-      event: "channel_message",
+      event: "game-status",
       channelId: body.channelId,
       name,
       content

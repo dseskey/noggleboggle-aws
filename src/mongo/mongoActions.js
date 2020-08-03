@@ -56,11 +56,11 @@ function submitAnswerToDataBase(mongoDb, gameId, playerDetail) {
 };
 
 
-function incrementQuestion(mongoDb, gameId) {
+function incrementQuestion(mongoDb, gameId, userId) {
     return new Promise((resolve, reject) => {
         let gamesCollection = mongoDb.collection('games');
 
-        gamesCollection.findOneAndUpdate({ _id: convertToObjectId(gameId) }, { $inc: { "questionDetail.currentQuestion": 1 } }).then((gameResult) => {
+        gamesCollection.findOneAndUpdate({ _id: convertToObjectId(gameId), owner: userId }, { $inc: { "questionDetail.currentQuestion": 1 } }).then((gameResult) => {
             if (gameResult.value.questionDetail.currentQuestion + 1 < gameResult.value.questionDetail.questions.length) {
                 let nextQuestion = gameResult.value.questionDetail.questions[gameResult.value.questionDetail.currentQuestion + 1];
                 delete nextQuestion.answerId;
@@ -77,12 +77,12 @@ function incrementQuestion(mongoDb, gameId) {
 }
 
 
-function getDetailsForScoreboard(mongoDb, gameId) {
+function getDetailsForScoreboard(mongoDb, gameId, userId) {
     return new Promise((resolve, reject) => {
         let gamesCollection = mongoDb.collection('games');
         let usersCollection = mongoDb.collection('users');
 
-        gamesCollection.findOne({ _id: convertToObjectId(gameId) }).then((game) => {
+        gamesCollection.findOne({ _id: convertToObjectId(gameId) , owner: userId}).then((game) => {
             let usersInGameWithScore = game.players.map((player) => {
                 return { playerId: player.playerId, totalPoints: player.totalPoints }
             })
@@ -100,13 +100,13 @@ function getDetailsForScoreboard(mongoDb, gameId) {
     })
 };
 
-function openGame(mongoDb, gameId) {
+function openGame(mongoDb, gameId, userId) {
     return new Promise((resolve, reject) => {
         let gamesCollection = mongoDb.collection('games');
 
         /*--Get collection and grab question list and current question, see if we have more questions--*/
         try {
-            gamesCollection.findOneAndUpdate({ _id: convertToObjectId(gameId) }, { $set: { isOpen: true, isStarted: true } }).then((gameResult) => {
+            gamesCollection.findOneAndUpdate({ _id: convertToObjectId(gameId), owner: userId }, { $set: { isOpen: true, isStarted: true } }).then((gameResult) => {
                 let question = gameResult.value.questionDetail.questions[gameResult.value.questionDetail.currentQuestion];
                 delete question.answerId;
                 resolve({ status: "CONTINUE", question: question });

@@ -27,7 +27,6 @@ const getUserIdFromConnection = require('./utilities').getUserIdFromConnection;
           */
 
 async function join(event, context, callback) {
-    console.log(event);
     const body = JSON.parse(event.body);
     await wsClient._setupClient(event);
 
@@ -44,9 +43,6 @@ async function join(event, context, callback) {
         });
     } else {
        let {userId, gameId} = gameAndUserIdStatus;
-       console.log('=> joining game');
-       console.log(userId);
-       console.log(gameId);
 
         //Get Collection to validate game code.
         //If user is in game, return the game details for the question, else add, update the game details, and return the game

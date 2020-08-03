@@ -5,17 +5,20 @@ const db = {
     Table: process.env.APPLICATION_TABLE,
     Primary: {
         Key: 'pk',
-        Range: 'sk'
+        Range: 'sk',
+        User: 'tk'
     },
     Connection: {
         Primary: {
             Key: 'pk',
-            Range: 'sk'
+            Range: 'sk',
+            User: 'tk'
         },
         Channels: {
             Index: 'reverse',
             Key: 'sk',
-            Range: 'pk'
+            Range: 'pk',
+            User: 'tk'
         },
         Prefix: 'CONNECTION|',
         Entity: 'CONNECTION'
@@ -23,18 +26,30 @@ const db = {
     Channel: {
         Primary: {
             Key: 'pk',
-            Range: 'sk'
+            Range: 'sk',
+            User: 'tk'
         },
         Connections: {
             Key: 'pk',
-            Range: 'sk'
+            Range: 'sk',
+            User: 'tk'
         },
         Messages: {
             Key: 'pk',
-            Range: 'sk'
+            Range: 'sk',
+            User: 'tk'
         },
         Prefix: 'CHANNEL|',
         Entity: 'CHANNEL'
+    },
+    User:{
+        Primary: {
+            Key: 'pk',
+            Range: 'sk',
+            User: 'tk'
+        },
+        Prefix: 'USER|',
+        Entity: 'USER'
     },
     Message: {
         Primary: {
@@ -49,7 +64,7 @@ const db = {
 const channelRegex = new RegExp(`^${db.Channel.Entity}\|`);
 const messageRegex = new RegExp(`^${db.Message.Entity}\|`);
 const connectionRegex = new RegExp(`^${db.Connection.Entity}\|`);
-
+const userRegex = new RegExp(`^${db.User.Entity}\|`);
 function parseEntityId(target){
     console.log('ENTITY ID A ', target)
 
@@ -61,7 +76,7 @@ function parseEntityId(target){
         target = target
                 .replace(channelRegex, '')
                 .replace(messageRegex, '')
-                .replace(connectionRegex, '');
+                .replace(connectionRegex, '').replace(userRegex, '');
     }
 
     return target.replace('|', ''); // why?!

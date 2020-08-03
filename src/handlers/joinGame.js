@@ -20,7 +20,12 @@ const fail500 = {
     statusCode: 500
 };
 
-
+/*
+const getUserIdFromConnection = require('./utilities').getUserIdFromConnection;
+          console.log('=> Calling get user ID from connection')
+          let x = await getUserIdFromConnection(event);
+          console.log("x = " + JSON.stringify(x));
+          */
 async function join(event, context, callback) {
     console.log(event);
     const body = JSON.parse(event.body);
@@ -63,17 +68,7 @@ async function join(event, context, callback) {
             }
         }
         else {
-            //Subscribe to the channel
-            await subscribeChannel(
-                {
-                    ...event,
-                    body: JSON.stringify({
-                        action: "subscribe",
-                        channelId: gameCode
-                    })
-                },
-                context
-            );
+
 
             var gameStatusForUser;
             try {
@@ -82,13 +77,13 @@ async function join(event, context, callback) {
                     let message = gameStatusForUser.message;
                     return wsClient.send(event, {
                         event: "game-status-error",
-                        channelId: body.channelId,
+                        channelId: gameCode,
                         message
                     });
                 } else {
                     return wsClient.send(event, {
                         event: "game-status-success",
-                        channelId: body.channelId,
+                        channelId: gameCode,
                         gameStatusForUser
                     });
                 }
@@ -98,7 +93,7 @@ async function join(event, context, callback) {
                 let message = error.message;
                 return wsClient.send(event, {
                     event: "game-status-error",
-                    channelId: body.channelId,
+                    channelId: gameCode,
                     message
                 });
             }
@@ -106,7 +101,7 @@ async function join(event, context, callback) {
     } catch (err) {
         console.error(err);
     }
-    return success;
+    // return success;
 
 
 }

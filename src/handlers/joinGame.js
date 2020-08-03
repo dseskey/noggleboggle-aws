@@ -22,7 +22,7 @@ const fail500 = {
 
 
 async function join(event, context, callback) {
-    
+    console.log(event);
     const body = JSON.parse(event.body);
     let gameCode = body.payload.gameId;
     let userId = body.payload.userId; //Note this will be replaced with cognito

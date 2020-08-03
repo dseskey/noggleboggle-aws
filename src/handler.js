@@ -2,6 +2,10 @@ const db = require("./db");
 const ws = require("./websocket-client");
 const sanitize = require("sanitize-html");
 
+const Bluebird = require("bluebird");
+const fetch = require("node-fetch");
+fetch.Promise = Bluebird;
+
 const wsClient = new ws.Client();
 
 const success = {
@@ -13,12 +17,30 @@ async function connectionManager(event, context) {
   // this goes away after CloudFormation support is added for web sockets
   await wsClient._setupClient(event);
 
-  if (event.requestContext.eventType === "CONNECT") {
-    console.log('=> event');
-    console.log(event);
-    console.log('=> context');
+  /*--Verify Cognito Token--*/
+  console.log("=> decrypt Token");
 
-    console.log(context);
+  const keys_url =
+    "https://cognito-idp.us-east-1.amazonaws.com/us-east-1_jL1h2S3Px/.well-known/jwks.json";
+
+  let token = event.headers['X-NBU'];
+  const rawRes = await fetch(keys_url);
+  const keyResponse = await rawRes.json();
+
+  var jwt = require('jsonwebtoken');
+  var jwkToPem = require('jwk-to-pem');
+  var pem = jwkToPem(keyResponse.keys[0]);
+
+  console.log("=> Decoding")
+  jwt.verify(token, pem, { algorithms: ['RS256'] }, function(err, decodedToken) {
+    if(err){
+        console.log(err);
+    }
+    console.log(decodedToken);
+  });
+  /*--End Verify Cognito Token--*/
+
+  if (event.requestContext.eventType === "CONNECT") {
     // sub general channel
     // await subscribeChannel(
     //   {
@@ -34,7 +56,7 @@ async function connectionManager(event, context) {
     return success;
   } else if (event.requestContext.eventType === "DISCONNECT") {
     // unsub all channels connection was in
-    const subscriptions =await db.fetchConnectionSubscriptions(event);
+    const subscriptions = await db.fetchConnectionSubscriptions(event);
     const unsubscribes = subscriptions.map(async subscription =>
       // just simulate / reuse the same as if they issued the request via the protocol
       unsubscribeChannel(
@@ -79,7 +101,7 @@ async function sendMessage(event, context) {
     allowedAttributes: {}
   });
   // save message in database for later
-  
+
   const item = await db.Client.put({
     TableName: db.Table,
     Item: {
@@ -88,7 +110,7 @@ async function sendMessage(event, context) {
       ConnectionId: `${event.requestContext.connectionId}`,
       Name: name,
       Content: content,
-    mongo: mongoCollection
+      mongo: mongoCollection
     }
   }).promise();
 
@@ -98,7 +120,7 @@ async function sendMessage(event, context) {
       subscriber[db.Channel.Connections.Range]
     );
     return wsClient.send(subscriberId, {
-      event: "game-status",
+      event: "channel_message",
       channelId: body.channelId,
       name,
       content
@@ -223,7 +245,7 @@ async function subscribeChannel(event, context) {
       [db.Channel.Connections.Key]: `${db.Channel.Prefix}${channelId}`,
       [db.Channel.Connections.Range]: `${db.Connection.Prefix}${
         db.parseEntityId(event)
-      }`
+        }`
     }
   }).promise();
 
@@ -242,7 +264,7 @@ async function unsubscribeChannel(event, context) {
       [db.Channel.Connections.Key]: `${db.Channel.Prefix}${channelId}`,
       [db.Channel.Connections.Range]: `${db.Connection.Prefix}${
         db.parseEntityId(event)
-      }`
+        }`
     }
   }).promise();
   return success;
@@ -255,5 +277,5 @@ module.exports = {
   broadcast,
   subscribeChannel,
   unsubscribeChannel,
-  channelManager
+  channelManager,
 };

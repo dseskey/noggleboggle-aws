@@ -37,7 +37,7 @@ async function start(event, context, callback) {
         } else {
             let { userId, gameId } = gameAndUserIdStatus;
             const mongoDb = await mongoConnection();
-            const openedGame = await openGame(mongoDb, gameId);
+            const openedGame = await openGame(mongoDb, gameId, userId);
 
             let payload = { "status": openedGame.status, "question": openedGame.question };
             return wsClient.send(event, {

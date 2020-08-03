@@ -37,7 +37,7 @@ async function show(event, context, callback) {
         } else {
             let { userId, gameId } = gameAndUserIdStatus;
             const mongoDb = await mongoConnection();
-            const usersAndPlayersScores = await getDetailsForScoreboard(mongoDb, gameId);
+            const usersAndPlayersScores = await getDetailsForScoreboard(mongoDb, gameId, userId);
             let usersFromDb = usersAndPlayersScores.usersFromDb;
             let playersAndScores = usersAndPlayersScores.playersAndScores.sort((a, b) => (a.totalPoints > b.totalPoints) ? -1 : ((b.totalPoints > a.totalPoints) ? 1 : 0));
             let scoreboard = playersAndScores.map((player) => {

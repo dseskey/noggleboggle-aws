@@ -39,7 +39,7 @@ async function next(event, context, callback) {
         try {
 
             const mongoDb = await mongoConnection();
-            const incrementStatus = await incrementQuestion(mongoDb, gameId);
+            const incrementStatus = await incrementQuestion(mongoDb, gameId, userId);
             let payload;
             if (incrementStatus.status == "CONTINUE") {
                 payload = { "status": incrementStatus.status, "question": incrementStatus.question }

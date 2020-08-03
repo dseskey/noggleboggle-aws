@@ -1,5 +1,5 @@
 const MongoClient = require('mongodb').MongoClient;
-const MONGODB_URI = 'mongodb+srv://noggleBoggleServer-dev:19SkCxi6II7L0Xth@noggleboggleeast.uppax.mongodb.net/test';
+const MONGODB_URI = '';
 
 let cachedDb = null;
 

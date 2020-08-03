@@ -3,7 +3,7 @@ const ws = require("./websocket-client");
 const sanitize = require("sanitize-html");
 const mongoConnection = require('./mongo/mongoConnection').connectToDatabase;
 const processGameState = require('./utilities').processGameState;
-const addUserToGame = require('./mongo/mongoActions').addUserToGame;
+const addUserToGameDb = require('./mongo/mongoActions').addUserToGame;
 
 const Bluebird = require("bluebird");
 const fetch = require("node-fetch");
@@ -98,20 +98,28 @@ async function connectionManager(event, context) {
           }
         }
         else {
-          //Subscribe to the channel
+          //Add user to game, then subscribe the user to the channel
           let userId = decryptedToken['custom:user'];
-          await subscribeToGameChannel(
-            {
-              ...event,
-              body: JSON.stringify({
-                action: "subscribe",
-                channelId: gameCode,
-              })
-            },
-            context,
-            userId
-          );
-          
+
+          let addedUserToGame = await addUserToGame(mongoDb, gameDetails, userId);
+          //Subscribe to the channel
+          if (addedUserToGame) {
+            await subscribeToGameChannel(
+              {
+                ...event,
+                body: JSON.stringify({
+                  action: "subscribe",
+                  channelId: gameCode,
+                })
+              },
+              context,
+              userId
+            );
+
+          }else{
+            return internalServerError;
+          }
+
         }
       } catch (err) {
         console.error(err);
@@ -315,7 +323,7 @@ async function subscribeToGameChannel(event, context, userId) {
       [db.Channel.Connections.Range]: `${db.Connection.Prefix}${
         db.parseEntityId(event)
         }`,
-        [db.Channel.Connections.User]: `${db.User.Prefix}${userId}`
+      [db.Channel.Connections.User]: `${db.User.Prefix}${userId}`
     }
   }).promise();
 
@@ -359,7 +367,7 @@ async function unsubscribeChannel(event, context) {
   return success;
 }
 
-async function getGameStatus(mongoDb, gameDetails, userId) {
+async function addUserToGame(mongoDb, gameDetails, userId) {
 
   //Subscribe to the channel
   let processedGameState = {};
@@ -368,19 +376,15 @@ async function getGameStatus(mongoDb, gameDetails, userId) {
     //If the user doesn't exist in the game yet, register them.
     gameDetails.players.push({ playerId: userId, totalPoints: 0, answers: [] });
     try {
-      let addUserStatus = await addUserToGame(mongoDb, gameDetails);
-      processedGameState = processGameState(gameDetails);
-      return processedGameState;
+      let addUserStatus = await addUserToGameDb(mongoDb, gameDetails);
+      return true;
 
     } catch (error) {
-      console.log('=>error 1')
-      console.log(error)
-      return { "status": "error", "message": "There was an error adding you to the game. Please try again." };
+      return false;
+      // return { "status": "error", "message": "There was an error adding you to the game. Please try again." };
     }
   } else {
-    //If the user exists, return the game
-    processedGameState = processGameState(gameDetails);
-    return processedGameState;
+    return true;
   }
 
 }

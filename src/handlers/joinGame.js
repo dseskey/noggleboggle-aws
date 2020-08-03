@@ -5,8 +5,7 @@ const ws = require("../websocket-client");
 const sanitize = require("sanitize-html");
 const mongoConnection = require('../mongo/mongoConnection').connectToDatabase;
 const processGameState = require('../utilities').processGameState;
-const addUserToGame = require('../mongo/mongoActions').addUserToGame;
-const getGameIdFromConnection =  require('../utilities').getGameIdFromConnection;
+const getUserAndGameIdFromConnection = require('../utilities').getUserAndGameIdFromConnection;
 
 "use strict";
 
@@ -26,82 +25,99 @@ const getUserIdFromConnection = require('./utilities').getUserIdFromConnection;
           let x = await getUserIdFromConnection(event);
           console.log("x = " + JSON.stringify(x));
           */
+
 async function join(event, context, callback) {
     console.log(event);
     const body = JSON.parse(event.body);
-    let gameCode = body.payload.gameId;
-    let userId = body.payload.userId; //Note this will be replaced with cognito
     await wsClient._setupClient(event);
 
-    //Get Collection to validate game code.
-    //If user is in game, return the game details for the question, else add, update the game details, and return the game
-    try {
-        var mongoDb;
-        try {
-            mongoDb = await mongoConnection();
-        } catch (error) {
-            let message = "Error connecting to the game database."
-            console.log('==> Error connecting to MongoDb: ' + JSON.stringify(error));
-            return wsClient.send(event, {
-                event: "game-status-error",
-                channelId: body.channelId,
-                message
-            });
-        }
-        const gameDetails = await queryDatabaseForGameCode(mongoDb, gameCode);
-        if (gameDetails.statusCode) {
-            if (gameDetails.statusCode == 400) {
-                let message = "Could not find a game with the provided game code.";
-                return wsClient.send(event, {
-                    event: "game-status-error",
-                    channelId: body.channelId,
-                    message
-                });
 
-            } else {
-                let message = "There was an error trying to load the game. Please try again later.";
+    //GEt Game ID and user ID from connetion
+    let gameAndUserIdStatus = await getUserAndGameIdFromConnection(event);
+    if (!gameAndUserIdStatus.status == 'success') {
+        let message = gameAndUserIdStatus.message;
+        console.log('==> Error getting user ID and game ID ' + JSON.stringify(error));
+        return wsClient.send(event, {
+            event: "game-status-error",
+            channelId: body.channelId,
+            message
+        });
+    } else {
+       let {userId, gameId} = gameAndUserIdStatus;
+       console.log('=> joining game');
+       console.log(userId);
+       console.log(gameId);
+
+        //Get Collection to validate game code.
+        //If user is in game, return the game details for the question, else add, update the game details, and return the game
+        try {
+            var mongoDb;
+            try {
+                mongoDb = await mongoConnection();
+            } catch (error) {
+                let message = "Error connecting to the game database."
+                console.log('==> Error connecting to MongoDb: ' + JSON.stringify(error));
                 return wsClient.send(event, {
                     event: "game-status-error",
                     channelId: body.channelId,
                     message
                 });
             }
-        }
-        else {
-
-
-            var gameStatusForUser;
-            try {
-                gameStatusForUser = await getGameStatus(mongoDb, gameDetails, userId);
-                if (gameStatusForUser.status) {
-                    let message = gameStatusForUser.message;
+            const gameDetails = await queryDatabaseForGameCode(mongoDb, gameId);
+            if (gameDetails.statusCode) {
+                if (gameDetails.statusCode == 400) {
+                    let message = "Could not find a game with the provided game code.";
                     return wsClient.send(event, {
                         event: "game-status-error",
-                        channelId: gameCode,
+                        channelId: body.channelId,
                         message
                     });
+
                 } else {
+                    let message = "There was an error trying to load the game. Please try again later.";
                     return wsClient.send(event, {
-                        event: "game-status-success",
-                        channelId: gameCode,
-                        gameStatusForUser
+                        event: "game-status-error",
+                        channelId: body.channelId,
+                        message
                     });
                 }
-            } catch (error) {
-                console.log('=> ERROR GETTING GAME');
-                console.log(error);
-                let message = error.message;
-                return wsClient.send(event, {
-                    event: "game-status-error",
-                    channelId: gameCode,
-                    message
-                });
             }
+            else {
+
+
+                var gameStatusForUser;
+                try {
+                    gameStatusForUser = await getGameStatus(mongoDb, gameDetails, userId);
+                    if (gameStatusForUser.status) {
+                        let message = gameStatusForUser.message;
+                        return wsClient.send(event, {
+                            event: "game-status-error",
+                            channelId: gameId,
+                            message
+                        });
+                    } else {
+                        return wsClient.send(event, {
+                            event: "game-status-success",
+                            channelId: gameId,
+                            gameStatusForUser
+                        });
+                    }
+                } catch (error) {
+                    console.log('=> ERROR GETTING GAME');
+                    console.log(error);
+                    let message = error.message;
+                    return wsClient.send(event, {
+                        event: "game-status-error",
+                        channelId: gameId,
+                        message
+                    });
+                }
+            }
+        } catch (err) {
+            console.error(err);
         }
-    } catch (err) {
-        console.error(err);
+        // return success;
     }
-    // return success;
 
 
 }

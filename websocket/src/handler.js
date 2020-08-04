@@ -101,7 +101,7 @@ async function connectionManager(event, context) {
         }
         else {
           //Add user to game, then subscribe the user to the channel
-          let userId = decryptedToken['custom:user'];
+          let userId = decryptedToken['cognito:username'];
 
           let addedUserToGame = await addUserToGame(mongoDb, gameDetails, userId);
           //Subscribe to the channel

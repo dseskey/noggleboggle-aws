@@ -12,3 +12,17 @@ functions:
           path: registration/setup
           method: post
           cors: false
+  getUser:
+    handler: ./src/handlers/users.getUser
+    events:
+      - http:
+          path: users/user
+          method: get
+          cors: false
+  getEventsForUser:
+    handler: ./src/handlers/events.getEventsForUser
+    events:
+      - http:
+          path: events/user
+          method: get
+          cors: false

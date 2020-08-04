@@ -128,7 +128,6 @@ async function getGameStatus(mongoDb, gameDetails, userId) {
         //If the user doesn't exist in the game yet, register them.
         gameDetails.players.push({ playerId: userId, totalPoints: 0, answers: [] });
         try {
-            let addUserStatus = await addUserToGame(mongoDb, gameDetails);
             processedGameState = processGameState(gameDetails);
             return processedGameState;
 

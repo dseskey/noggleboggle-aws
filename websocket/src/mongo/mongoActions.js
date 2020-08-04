@@ -23,7 +23,7 @@ function queryDatabaseForGameCode(mongoDb, gameId) {
         });
 }
 
-function addUserToGame(mongoDb, gameDetails) {
+function addUserToGame(mongoDb, gameDetails, userID) {
 
     return new Promise((resolve, reject) => {
         let gamesCollection = mongoDb.collection('games');

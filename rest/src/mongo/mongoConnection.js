@@ -3,26 +3,26 @@ const MONGODB_URI = 'mongodb+srv://lambdauser:aOd6g1w3nOsA8NYb@noggleboggleeast.
 
 let cachedDb = null;
 
-function connectToDatabase() {
-    return new Promise((resolve, reject) => {
+async function connectToDatabase() {
+  
         if (cachedDb) {
-            resolve(cachedDb);
+            return ({status: 200, db: cachedDb});
         }
-
+        
         MongoClient.connect(MONGODB_URI, function (err, mongoDb) {
             if (err) {
                 console.log(err);
-                reject(err);
+                return({status: 500, message: err});
 
 
             } else {
                 // let connection = mongoDb.db('noggle-boggle-trivia-dev');
                 console.log('=> connectingNonCached to database');
                 cachedDb = mongoDb.db('noggle-boggle-trivia-dev');;
-                resolve(cachedDb);
+                return ({status: 200, db: cachedDb});
             }
         });
-    });
+   
     // return MongoClient.connect(uri)
     //     .then(db => {
     // console.log('=> connectingNonCached to database');

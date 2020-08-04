@@ -27,6 +27,7 @@ const getUserIdFromConnection = require('./utilities').getUserIdFromConnection;
           */
 
 async function join(event, context, callback) {
+    console.log(event);
     const body = JSON.parse(event.body);
     await wsClient._setupClient(event);
 

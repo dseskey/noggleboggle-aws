@@ -33,21 +33,23 @@ async function connectionManager(event, context) {
   // we do this so first connect EVER sets up some needed config state in db
   // this goes away after CloudFormation support is added for web sockets
   await wsClient._setupClient(event);
-
-
+  
   /*--End Verify Cognito Token--*/
-
+  
   if (event.requestContext.eventType === "CONNECT") {
     /*--Verify Cognito Token--*/
-    console.log(event);
+    // console.log(event);
 
     const keys_url =
       "https://cognito-idp.us-east-1.amazonaws.com/us-east-1_jL1h2S3Px/.well-known/jwks.json";
 
     let decryptedToken;
+    let queryStringParameters = event.queryStringParameters;
 
     try {
-      let token = event.headers['X-NBU'];
+      // let token = event.headers['X-NBU'];
+
+      let token = queryStringParameters.NBU.split(',')[0];
       if (!token) {
         console.log("No Token Found");
         return invalidTokenResponse;
@@ -75,9 +77,9 @@ async function connectionManager(event, context) {
       console.log("Token Not Present");
       return invalidTokenResponse;
     }
-
-    if (event.headers['X-GID']) {
-      let gameCode = event.headers['X-GID'];
+    let gameCode = queryStringParameters.NBU.split(',')[1];
+    if (gameCode) {
+      // let gameCode = event.headers['X-GID'];
       try {
         var mongoDb;
         try {

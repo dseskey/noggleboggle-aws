@@ -1,0 +1,14 @@
+service: noggleboggle-rest
+
+provider:
+  name: aws
+  runtime: nodejs12.x
+
+functions:
+  setupUser:
+    handler: ./src/handlers/registration.setupUser
+    events:
+      - http:
+          path: registration/setup
+          method: post
+          cors: false

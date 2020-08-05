@@ -43,7 +43,7 @@ async function join(event, context, callback) {
             message
         });
     } else {
-       let {userId, gameId} = gameAndUserIdStatus;
+        let { userId, gameId } = gameAndUserIdStatus;
 
         //Get Collection to validate game code.
         //If user is in game, return the game details for the question, else add, update the game details, and return the game
@@ -80,34 +80,49 @@ async function join(event, context, callback) {
                 }
             }
             else {
-
-
-                var gameStatusForUser;
-                try {
-                    gameStatusForUser = await getGameStatus(mongoDb, gameDetails, userId);
-                    if (gameStatusForUser.status) {
-                        let message = gameStatusForUser.message;
+                if (!(userId == gameDetails.owner)) {
+             
+                    var gameStatusForUser;
+                    try {
+                        gameStatusForUser = await getGameStatus(mongoDb, gameDetails, userId);
+                        if (gameStatusForUser.status) {
+                            let message = gameStatusForUser.message;
+                            return wsClient.send(event, {
+                                event: "game-status-error",
+                                channelId: gameId,
+                                message
+                            });
+                        } else {
+                            return wsClient.send(event, {
+                                event: "game-status-success",
+                                channelId: gameId,
+                                gameStatusForUser
+                            }, userId);
+                        }
+                    } catch (error) {
+                        console.log('=> ERROR GETTING GAME');
+                        console.log(error);
+                        let message = error.message;
                         return wsClient.send(event, {
                             event: "game-status-error",
                             channelId: gameId,
                             message
-                        });
-                    } else {
-                        return wsClient.send(event, {
-                            event: "game-status-success",
-                            channelId: gameId,
-                            gameStatusForUser
-                        });
+                        }
+                        );
                     }
-                } catch (error) {
-                    console.log('=> ERROR GETTING GAME');
-                    console.log(error);
-                    let message = error.message;
+                }else{
+                    let responseObj = {
+                        message: "Game master has successfully joined the game.",
+                        currentQuestion: gameDetails.questionDetail.currentQuestion,
+                        isOpen: gameDetails.isOpen,
+                        isComplete: gameDetails.isComplete,
+                        isStarted: gameDetails.isStarted
+                    }
                     return wsClient.send(event, {
-                        event: "game-status-error",
+                        event: "game-status-success",
                         channelId: gameId,
-                        message
-                    });
+                        responseObj
+                    }, userId);
                 }
             }
         } catch (err) {

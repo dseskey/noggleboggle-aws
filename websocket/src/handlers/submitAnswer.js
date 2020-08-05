@@ -123,6 +123,20 @@ function buildGameDetailForUserAnswerUpdate(gameDetails, userId, submittedAnswer
             playerDetails.answers.push(userAnswer);
             playerDetails.totalPoints = playerDetails.totalPoints + 0;
         }
+    }else if (gameDetailQuestion.type === 'openEnded') {
+        let correctAnswer = gameDetailQuestion.answerOptions.filter((option) => {
+            return option.toLowerCase() == submittedAnswer.answer.toLowerCase();
+        })
+        console.log(correctAnswer)
+        if (correctAnswer.length > 0) {
+            userAnswer.pointsAwarded = gameDetailQuestion.pointsAvailable;
+            playerDetails.answers.push(userAnswer);
+            playerDetails.totalPoints = playerDetails.totalPoints + gameDetailQuestion.pointsAvailable;
+        } else {
+            userAnswer.pointsAwarded = 0;
+            playerDetails.answers.push(userAnswer);
+            playerDetails.totalPoints = playerDetails.totalPoints + 0;
+        }
     } else {
 
     }

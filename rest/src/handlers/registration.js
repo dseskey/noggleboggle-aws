@@ -23,7 +23,7 @@ function dbConnectAndExecute(dbUrl, fn) {
   return dbExecute(mongoose.connect(dbUrl), fn);
 }
 
-module.exports.getEvents = (event, context, callback) => {
+module.exports.setupUser = (event, context, callback) => {
   const data = JSON.parse(event.body);
   let token = event.headers.Authorization;
 

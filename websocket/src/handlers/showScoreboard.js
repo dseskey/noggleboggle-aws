@@ -41,15 +41,28 @@ async function show(event, context, callback) {
             let usersFromDb = usersAndPlayersScores.usersFromDb;
             let playersAndScores = usersAndPlayersScores.playersAndScores.sort((a, b) => (a.totalPoints > b.totalPoints) ? -1 : ((b.totalPoints > a.totalPoints) ? 1 : 0));
             let scoreboard = playersAndScores.map((player) => {
-                let user = usersFromDb.find((user) => user._id == player.playerId);
+                console.log(usersFromDb);
+                let user = usersFromDb.find((user) => user.userId == player.playerId);
+                console.log('=> User' );
+                console.log(user);
+                console.log(player.playerId);
                 return ({ playerId: player.playerId, totalScore: player.totalPoints, displayName: user.displayName })
             });
 
             let payload = scoreboard;
-            return wsClient.send(event, {
-                event: "game-status-success",
-                channelId: body.channelId,
-                payload
+            // sendMessage(event, "game-status-success", gameId, payload);
+            const subscribers = await db.fetchChannelSubscriptions(gameId);
+            console.log("=> SUBSCRIBERS");
+            console.log(subscribers);
+            const results = subscribers.map(async subscriber => {
+                const subscriberId = db.parseEntityId(
+                    subscriber[db.Channel.Connections.Range]
+                );
+                return wsClient.send(subscriberId, {
+                    event: "game-status-success",
+                    channelId: gameId,
+                    payload
+                });
             });
         }
     } catch (err) {

@@ -40,10 +40,19 @@ async function start(event, context, callback) {
             const openedGame = await openGame(mongoDb, gameId, userId);
 
             let payload = { "status": openedGame.status, "question": openedGame.question };
-            return wsClient.send(event, {
-                event: "game-status-success",
-                channelId: gameId,
-                payload
+            // sendMessage(event, "game-status-success", gameId, payload);
+            const subscribers = await db.fetchChannelSubscriptions(gameId);
+            console.log("=> SUBSCRIBERS");
+            console.log(subscribers);
+            const results = subscribers.map(async subscriber => {
+                const subscriberId = db.parseEntityId(
+                    subscriber[db.Channel.Connections.Range]
+                );
+                return wsClient.send(subscriberId, {
+                    event: "game-status-success",
+                    channelId: gameId,
+                    payload
+                });
             });
         }
     } catch (err) {

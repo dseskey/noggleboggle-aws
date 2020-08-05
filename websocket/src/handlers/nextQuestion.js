@@ -46,10 +46,19 @@ async function next(event, context, callback) {
             } else {
                 payload = { "status": incrementStatus.status, "message": incrementStatus.message }
             }
-            return wsClient.send(event, {
-                event: "game-status-success",
-                channelId: gameId,
-                payload
+            // sendMessage(event, "game-status-success", gameId, payload);
+            const subscribers = await db.fetchChannelSubscriptions(gameId);
+            console.log("=> SUBSCRIBERS");
+            console.log(subscribers);
+            const results = subscribers.map(async subscriber => {
+                const subscriberId = db.parseEntityId(
+                    subscriber[db.Channel.Connections.Range]
+                );
+                return wsClient.send(subscriberId, {
+                    event: "game-status-success",
+                    channelId: gameId,
+                    payload
+                });
             });
         } catch (err) {
             console.error(err);
@@ -63,7 +72,16 @@ async function next(event, context, callback) {
     }
 
 }
+async function sendMessage(event, eventResponseType, gameId, payload) {
+    // save message for future history
+    // saving with timestamp allows sorting
+    // maybe do ttl?
 
+
+
+    await Promise.all(results);
+    return success;
+}
 module.exports = {
     next
 };

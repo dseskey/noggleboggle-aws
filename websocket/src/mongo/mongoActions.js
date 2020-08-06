@@ -23,7 +23,7 @@ function queryDatabaseForGameCode(mongoDb, gameId) {
         });
 }
 
-function addUserToGame(mongoDb, gameDetails) {
+function addUserToGame(mongoDb, gameDetails, userID) {
 
     return new Promise((resolve, reject) => {
         let gamesCollection = mongoDb.collection('games');
@@ -78,16 +78,21 @@ function incrementQuestion(mongoDb, gameId, userId) {
 
 
 function getDetailsForScoreboard(mongoDb, gameId, userId) {
+    console.log("=> In Details");
+    console.log(gameId);
+    console.log(userId);
     return new Promise((resolve, reject) => {
         let gamesCollection = mongoDb.collection('games');
         let usersCollection = mongoDb.collection('users');
 
         gamesCollection.findOne({ _id: convertToObjectId(gameId) , owner: userId}).then((game) => {
+            console.log("=>game");
+            console.log(game);
             let usersInGameWithScore = game.players.map((player) => {
                 return { playerId: player.playerId, totalPoints: player.totalPoints }
             })
-
-            usersCollection.find({ _id: { $in: game.players.map(player => convertToObjectId(player.playerId)) } }).project({ _id: 1, displayName: 1 }).toArray((err, users) => {
+            console.log(usersInGameWithScore);
+            usersCollection.find({ userId: { $in: game.players.map(player => player.playerId) } }).project({ userId: 1, displayName: 1 }).toArray((err, users) => {
                 if (err) {
                     reject({ message: 'There was an error getting the users for scoreboard.', error: error });
                 }
@@ -95,6 +100,8 @@ function getDetailsForScoreboard(mongoDb, gameId, userId) {
             });
 
         }).catch(error => {
+            console.log('THIS ERROR');
+            console.log(error);
             reject({ status: "error", message: 'Could not get the game to generate the scoreboard.', error: error });
         });
     })

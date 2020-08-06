@@ -72,7 +72,7 @@ async function submit(event, context, callback) {
                     let storageResult = await submitAnswerToDataBase(mongoDb, gameId, playerUpdateObject);
                     let message = storageResult.message;
                     return wsClient.send(event, {
-                        event: "game-status",
+                        event: "game-status-success",
                         channelId: body.channelId,
                         message
                     });
@@ -115,6 +115,20 @@ function buildGameDetailForUserAnswerUpdate(gameDetails, userId, submittedAnswer
     userAnswer.answer = submittedAnswer.answer;
     if (gameDetailQuestion.type === 'multipleChoice') {
         if (gameDetailQuestion.answerId == submittedAnswer.answer) {
+            userAnswer.pointsAwarded = gameDetailQuestion.pointsAvailable;
+            playerDetails.answers.push(userAnswer);
+            playerDetails.totalPoints = playerDetails.totalPoints + gameDetailQuestion.pointsAvailable;
+        } else {
+            userAnswer.pointsAwarded = 0;
+            playerDetails.answers.push(userAnswer);
+            playerDetails.totalPoints = playerDetails.totalPoints + 0;
+        }
+    }else if (gameDetailQuestion.type === 'openEnded') {
+        let correctAnswer = gameDetailQuestion.answerOptions.filter((option) => {
+            return option.toLowerCase() == submittedAnswer.answer.toLowerCase();
+        })
+        console.log(correctAnswer)
+        if (correctAnswer.length > 0) {
             userAnswer.pointsAwarded = gameDetailQuestion.pointsAvailable;
             playerDetails.answers.push(userAnswer);
             playerDetails.totalPoints = playerDetails.totalPoints + gameDetailQuestion.pointsAvailable;

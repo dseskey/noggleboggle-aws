@@ -72,7 +72,7 @@ async function submit(event, context, callback) {
                     let storageResult = await submitAnswerToDataBase(mongoDb, gameId, playerUpdateObject);
                     let message = storageResult.message;
                     return wsClient.send(event, {
-                        event: "game-status",
+                        event: "game-status-success",
                         channelId: body.channelId,
                         message
                     });

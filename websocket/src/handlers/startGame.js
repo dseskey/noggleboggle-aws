@@ -42,8 +42,6 @@ async function start(event, context, callback) {
             let payload = { "status": openedGame.status, "question": openedGame.question };
             // sendMessage(event, "game-status-success", gameId, payload);
             const subscribers = await db.fetchChannelSubscriptions(gameId);
-            console.log("=> SUBSCRIBERS");
-            console.log(subscribers);
             const results = subscribers.map(async subscriber => {
                 const subscriberId = db.parseEntityId(
                     subscriber[db.Channel.Connections.Range]

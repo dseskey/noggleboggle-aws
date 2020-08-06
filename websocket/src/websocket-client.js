@@ -68,6 +68,7 @@ class Client {
             ConnectionId,
             Data: JSON.stringify(payload)
         }).promise().catch(async err => {
+            console.log("=>Error");
             console.log(JSON.stringify(err))
           
             if (err.statusCode === 410) {
@@ -89,6 +90,7 @@ class Client {
                 );
 
                 await Promise.all(unsubscribes);
+                
             }
         });
 

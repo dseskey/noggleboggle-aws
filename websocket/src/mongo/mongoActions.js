@@ -66,9 +66,14 @@ function incrementQuestion(mongoDb, gameId, userId) {
                 delete nextQuestion.answerId;
                 resolve({ status: "CONTINUE", question: nextQuestion });
             } else {
-                resolve({ status: "END", message: "End of Game" })
+                //End the game and mark it as closed.
+                gamesCollection.findOneAndUpdate({ _id: convertToObjectId(gameId), owner: userId }, { $inc: { "questionDetail.currentQuestion": -1 }, $set: {isComplete: true}}).then((gameResult) => {
+                        
+                    resolve({ status: "END", message: "End of Game" })
+                }).catch(error => {
+                    reject({ status: "error", message: 'There was an error incrementing the question and closing the game.', error: error });
+                });
             }
-            resolve({ status: "success", message: "Question Succesfully incremented. " })
         }).catch(error => {
             reject({ status: "error", message: 'There was an error incrementing the question.', error: error });
         });

@@ -54,12 +54,15 @@ async function next(event, context, callback) {
                 const subscriberId = db.parseEntityId(
                     subscriber[db.Channel.Connections.Range]
                 );
+                
                 return wsClient.send(subscriberId, {
                     event: "game-status-success",
                     channelId: gameId,
                     payload
                 });
             });
+            await Promise.all(results);
+
         } catch (err) {
             console.error(err);
             let message = "There was an error incrementing the question, please try again."
@@ -72,16 +75,7 @@ async function next(event, context, callback) {
     }
 
 }
-async function sendMessage(event, eventResponseType, gameId, payload) {
-    // save message for future history
-    // saving with timestamp allows sorting
-    // maybe do ttl?
 
-
-
-    await Promise.all(results);
-    return success;
-}
 module.exports = {
     next
 };

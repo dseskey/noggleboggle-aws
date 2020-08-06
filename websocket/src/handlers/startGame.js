@@ -52,6 +52,9 @@ async function start(event, context, callback) {
                     payload
                 });
             });
+
+            await Promise.all(results);
+
         }
     } catch (err) {
         console.error(err);

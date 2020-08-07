@@ -64,6 +64,7 @@ function incrementQuestion(mongoDb, gameId, userId) {
             if (gameResult.value.questionDetail.currentQuestion + 1 < gameResult.value.questionDetail.questions.length) {
                 let nextQuestion = gameResult.value.questionDetail.questions[gameResult.value.questionDetail.currentQuestion + 1];
                 delete nextQuestion.answerId;
+                delete nextQuestion.answerOptions;
                 resolve({ status: "CONTINUE", question: nextQuestion });
             } else {
                 //End the game and mark it as closed.

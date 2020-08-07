@@ -141,15 +141,22 @@ function buildGameDetailForUserAnswerUpdate(gameDetails, userId, submittedAnswer
             playerDetails.totalPoints = playerDetails.totalPoints + 0;
         }
     }else if (gameDetailQuestion.type === 'openEnded') {
+        console.log("=> IN QUESTION OPEN ENDED");
         let correctAnswer = gameDetailQuestion.answerOptions.filter((option) => {
             return option.toLowerCase() == submittedAnswer.answer.toLowerCase();
         })
+        console.log("=> CORRECT ANSWER");
+
         console.log(correctAnswer)
         if (correctAnswer.length > 0) {
+            console.log("=> IN QUESTION OPEN ENDED RIGHT");
+
             userAnswer.pointsAwarded = gameDetailQuestion.pointsAvailable;
             playerDetails.answers.push(userAnswer);
             playerDetails.totalPoints = playerDetails.totalPoints + gameDetailQuestion.pointsAvailable;
         } else {
+            console.log("=> IN QUESTION OPEN ENDED WRONG");
+
             userAnswer.pointsAwarded = 0;
             playerDetails.answers.push(userAnswer);
             playerDetails.totalPoints = playerDetails.totalPoints + 0;

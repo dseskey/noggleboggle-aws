@@ -124,9 +124,13 @@ function openGame(mongoDb, gameId, userId) {
                 resolve({ status: "CONTINUE", question: question });
 
             }).catch((error) => {
+                console.log("=> ERROR 1")
+            console.log(error);
                 reject({ message: 'There was an error accessing the games collection for starting the game.', error: error });
             });
         } catch (error) {
+            console.log("=> ERROR 2")
+            console.log(error);
             reject({ message: 'There was an error accessing the games collection for  starting the game with the given ID', error: error });
         }
     });

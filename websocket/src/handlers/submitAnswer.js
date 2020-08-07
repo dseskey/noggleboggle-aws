@@ -43,9 +43,19 @@ async function submit(event, context, callback) {
             let { userId, gameId } = gameAndUserIdStatus;
             const mongoDb = await mongoConnection();
             const gameDetails = await getGameDetails(mongoDb, gameId);
-            if (doesUserExistInGame(gameDetails, userId)) {
+            if (isGameOwner(gameDetails, userId)) {
+                //Build response and fail
+                let message = "The game master cannot answer questions! You are all knowing!"
+                return wsClient.send(event, {
+                    event: "game-status-error",
+                    channelId: body.channelId,
+                    message
+                });
+            }
+            else if (doesUserExistInGame(gameDetails, userId)) {
                 //If the user doesn't exist in the game yet, reject
                 //Build response and fail
+                //THIS STATE SHOULD NOT HAPPEN WITH NEW JOIN GAME ON CONNECT.
 
                 // reject({ message: 'User is not part of game, please join the game' });
             } else {
@@ -92,6 +102,13 @@ async function submit(event, context, callback) {
     }
 }
 
+function isGameOwner(gameDetails, userId){
+    if(gameDetails.owner == userId){
+        return true;
+    }
+    return false;
+}
+ 
 function doesUserExistInGame(gameDetails, userId) {
     let foundUser = gameDetails.players.filter(player => player.playerId == userId);
     return foundUser > 1;

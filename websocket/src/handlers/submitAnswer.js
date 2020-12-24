@@ -8,7 +8,7 @@ const mongoConnection = require('../mongo/mongoConnection').connectToDatabase;
 const getGameDetails = require('../mongo/mongoActions').queryDatabaseForGameCode;
 const submitAnswerToDataBase = require('../mongo/mongoActions').submitAnswerToDataBase;
 const getUserAndGameIdFromConnection = require('../utilities').getUserAndGameIdFromConnection;
-
+const moment = require('moment-timezone');
 let cachedDb = null;
 const wsClient = new ws.Client();
 
@@ -134,12 +134,15 @@ function buildGameDetailForUserAnswerUpdate(gameDetails, userId, submittedAnswer
         if (gameDetailQuestion.answerId == submittedAnswer.answer) {
             userAnswer.pointsAwarded = gameDetailQuestion.pointsAvailable;
             playerDetails.answers.push(userAnswer);
+            userAnswer.timeSubmitted = moment().tz("America/New_York").format("YYYY-MM-DDTHH:mm:ss");
             playerDetails.totalPoints = playerDetails.totalPoints + gameDetailQuestion.pointsAvailable;
         } else {
             userAnswer.pointsAwarded = 0;
+            userAnswer.timeSubmitted = moment().tz("America/New_York").format("YYYY-MM-DDTHH:mm:ss");
             playerDetails.answers.push(userAnswer);
             playerDetails.totalPoints = playerDetails.totalPoints + 0;
         }
+
     }else if (gameDetailQuestion.type === 'openEnded') {
         console.log("=> IN QUESTION OPEN ENDED");
         let correctAnswer = gameDetailQuestion.answerOptions.filter((option) => {
@@ -152,12 +155,14 @@ function buildGameDetailForUserAnswerUpdate(gameDetails, userId, submittedAnswer
             console.log("=> IN QUESTION OPEN ENDED RIGHT");
 
             userAnswer.pointsAwarded = gameDetailQuestion.pointsAvailable;
+            userAnswer.timeSubmitted = moment().tz("America/New_York").format("YYYY-MM-DDTHH:mm:ss");
             playerDetails.answers.push(userAnswer);
             playerDetails.totalPoints = playerDetails.totalPoints + gameDetailQuestion.pointsAvailable;
         } else {
             console.log("=> IN QUESTION OPEN ENDED WRONG");
 
             userAnswer.pointsAwarded = 0;
+            userAnswer.timeSubmitted = moment().tz("America/New_York").format("YYYY-MM-DDTHH:mm:ss");
             playerDetails.answers.push(userAnswer);
             playerDetails.totalPoints = playerDetails.totalPoints + 0;
         }

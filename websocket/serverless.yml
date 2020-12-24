@@ -48,9 +48,18 @@ functions:
     events:
       - websocket:
           route: $connect
+          authorizer:
+            name: "authFunc"
+            identitySource:
+              - "route.request.querystring.NBU"
       - websocket:
           route: $disconnect
 
+  authFunc:
+    handler: src/handlers/auth.authFunc
+    environment:
+      APP_CLIENT_ID: 4824542b7309c2h8cnv2e94f35
+      USER_POOL_ID:  us-east-1_jL1h2S3Px
   # just in case we are getting weird / bad data
   # we can react to it with a sane response
   defaultMessages:

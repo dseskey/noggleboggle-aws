@@ -28,6 +28,27 @@ const badRequest = {
   statusCode: 400
 };
 
+async function addUserToGame(mongoDb, gameDetails, userId) {
+
+  //Subscribe to the channel
+  let processedGameState = {};
+  let foundUser = gameDetails.players.filter(player => player.playerId == userId);
+  if (foundUser < 1) {
+    //If the user doesn't exist in the game yet, register them.
+    gameDetails.players.push({ playerId: userId, totalPoints: 0, answers: [] });
+    try {
+      let addUserStatus = await addUserToGameDb(mongoDb, gameDetails);
+      return true;
+
+    } catch (error) {
+      return false;
+      // return { "status": "error", "message": "There was an error adding you to the game. Please try again." };
+    }
+  } else {
+    return true;
+  }
+
+}
 
 async function connectionManager(event, context) {
   // we do this so first connect EVER sets up some needed config state in db
@@ -35,13 +56,14 @@ async function connectionManager(event, context) {
   await wsClient._setupClient(event);
   
   /*--End Verify Cognito Token--*/
-  
   if (event.requestContext.eventType === "CONNECT") {
     /*--Verify Cognito Token--*/
     // console.log(event);
 
     const keys_url =
       "https://cognito-idp.us-east-1.amazonaws.com/us-east-1_jL1h2S3Px/.well-known/jwks.json";
+    console.log("EVENT: " + JSON.stringify(event));
+    console.log("CONTEXT: " + JSON.stringify(context));
 
     let decryptedToken;
     let queryStringParameters = event.queryStringParameters;
@@ -54,11 +76,15 @@ async function connectionManager(event, context) {
         console.log("No Token Found");
         return invalidTokenResponse;
       }
+      console.log("HERE1")
       const rawRes = await fetch(keys_url);
       const keyResponse = await rawRes.json();
+      console.log("HERE2")
 
       var jwt = require('jsonwebtoken');
       var jwkToPem = require('jwk-to-pem');
+      console.log("HERE3")
+
       var pem = jwkToPem(keyResponse.keys[0]);
 
       decryptedToken = jwt.verify(token, pem, { algorithms: ['RS256'] }, function (err, decodedToken) {
@@ -77,7 +103,10 @@ async function connectionManager(event, context) {
       console.log("Token Not Present");
       return invalidTokenResponse;
     }
-    let gameCode = queryStringParameters.NBU.split(',')[1];
+    console.log("HERE4")
+
+    let gameCode = queryStringParameters.GAME;
+    console.log("GAME CODE = " + gameCode);
     if (gameCode) {
       // let gameCode = event.headers['X-GID'];
       try {
@@ -93,6 +122,7 @@ async function connectionManager(event, context) {
         if (gameDetails.statusCode) {
           if (gameDetails.statusCode == 400) {
             let message = "Could not find a game with the provided game code.";
+            console.log("HERE 1234")
             return invalidTokenResponse;
           } else {
             let message = "There was an error trying to load the game. Please try again later.";
@@ -103,14 +133,14 @@ async function connectionManager(event, context) {
           //Add user to game, then subscribe the user to the channel
           let userId = decryptedToken['cognito:username'];
 
-          let addUserToGame;
+          let wasUserAddedToGame;
           if(gameDetails.owner != userId){
-          addUserToGame = await addUserToGame(mongoDb, gameDetails, userId);
+            wasUserAddedToGame = await addUserToGame(mongoDb, gameDetails, userId);
           }else{
-            addUserToGame = false;
+            wasUserAddedToGame = true;
           }
           //Subscribe to the channel
-          if (addedUserToGame) {
+          if (wasUserAddedToGame) {
             await subscribeToGameChannel(
               {
                 ...event,
@@ -374,27 +404,7 @@ async function unsubscribeChannel(event, context) {
   return success;
 }
 
-async function addUserToGame(mongoDb, gameDetails, userId) {
 
-  //Subscribe to the channel
-  let processedGameState = {};
-  let foundUser = gameDetails.players.filter(player => player.playerId == userId);
-  if (foundUser < 1) {
-    //If the user doesn't exist in the game yet, register them.
-    gameDetails.players.push({ playerId: userId, totalPoints: 0, answers: [] });
-    try {
-      let addUserStatus = await addUserToGameDb(mongoDb, gameDetails);
-      return true;
-
-    } catch (error) {
-      return false;
-      // return { "status": "error", "message": "There was an error adding you to the game. Please try again." };
-    }
-  } else {
-    return true;
-  }
-
-}
 
 
 

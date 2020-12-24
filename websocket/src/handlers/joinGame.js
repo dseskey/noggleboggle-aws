@@ -194,6 +194,9 @@ function queryDatabaseForGameCode(mongoDb, gameId) {
 
     return mongoDb.collection('games').findOne({ _id: convertToObjectId(gameId) })
         .then((gameDetail) => {
+            console.log("=> GAME DETAIL")
+            console.log(gameDetail);
+            console.log(gameId);
             if (gameDetail == null) {
                 return { statusCode: 400, message: "Game not found." };
             }

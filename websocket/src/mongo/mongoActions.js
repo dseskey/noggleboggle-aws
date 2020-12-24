@@ -47,7 +47,7 @@ function submitAnswerToDataBase(mongoDb, gameId, playerDetail) {
         try {
             gamesCollection.updateOne({ _id: convertToObjectId(gameId), "players.playerId": playerDetail.playerId },
                 { $set: { "players.$": playerDetail } });
-            resolve({ status: "success", message: "Answer Submitted. Please Wait" });
+            resolve({ status: "success", message: "Answer Submitted. Please Wait." });
         } catch (error) {
             reject({ status: "error", message: 'There was an error updating the player\'s answers.', error: error });
         }

@@ -8,8 +8,11 @@
     "bluebird": "^3.7.2",
     "jsonwebtoken": "^8.5.1",
     "jwk-to-pem": "^2.0.4",
+    "moment": "^2.27.0",
+    "moment-timezone": "^0.5.31",
     "mongodb": "^3.5.9",
-    "node-fetch": "^2.6.0",
+    "node-fetch": "^2.6.1",
+    "node-jose": "^2.0.0",
     "sanitize-html": "^1.20.0"
   },
   "devDependencies": {},

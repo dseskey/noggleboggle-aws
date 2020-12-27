@@ -4,7 +4,8 @@ const sanitize = require("sanitize-html");
 const mongoConnection = require('./mongo/mongoConnection').connectToDatabase;
 const processGameState = require('./utilities').processGameState;
 const addUserToGameDb = require('./mongo/mongoActions').addUserToGame;
-
+require('dotenv').config()
+const KEYS_URL = 'https://cognito-idp.'+process.env.AWS_REGION+'.amazonaws.com/'+process.env.USER_POOL_ID+'/.well-known/jwks.json';
 const Bluebird = require("bluebird");
 const fetch = require("node-fetch");
 fetch.Promise = Bluebird;
@@ -33,15 +34,12 @@ async function connectionManager(event, context) {
   // we do this so first connect EVER sets up some needed config state in db
   // this goes away after CloudFormation support is added for web sockets
   await wsClient._setupClient(event);
-  
   /*--End Verify Cognito Token--*/
   
   if (event.requestContext.eventType === "CONNECT") {
     /*--Verify Cognito Token--*/
     // console.log(event);
 
-    const keys_url =
-      "https://cognito-idp.us-east-1.amazonaws.com/us-east-1_jL1h2S3Px/.well-known/jwks.json";
 
     let decryptedToken;
     let queryStringParameters = event.queryStringParameters;
@@ -54,7 +52,7 @@ async function connectionManager(event, context) {
         console.log("No Token Found");
         return invalidTokenResponse;
       }
-      const rawRes = await fetch(keys_url);
+      const rawRes = await fetch(KEYS_URL);
       const keyResponse = await rawRes.json();
 
       var jwt = require('jsonwebtoken');
@@ -77,7 +75,7 @@ async function connectionManager(event, context) {
       console.log("Token Not Present");
       return invalidTokenResponse;
     }
-    let gameCode = queryStringParameters.NBU.split(',')[1];
+    let gameCode = queryStringParameters.GAME;
     if (gameCode) {
       // let gameCode = event.headers['X-GID'];
       try {
@@ -96,6 +94,7 @@ async function connectionManager(event, context) {
             return invalidTokenResponse;
           } else {
             let message = "There was an error trying to load the game. Please try again later.";
+            console.log("HERE1");
             return internalServerError;
           }
         }
@@ -119,6 +118,7 @@ async function connectionManager(event, context) {
             );
 
           }else{
+            console.log("HERE2")
             return internalServerError;
           }
 

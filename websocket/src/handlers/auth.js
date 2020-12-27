@@ -7,7 +7,6 @@ const {informational, error, warning}  = require('../logging/log');
 const {Unauthorized, BadRequest, InternalServerError} = require('../httpResponseSturctures');
 
 module.exports.authorization = async (event, context, callback) => {
-  
   if(!event.queryStringParameters){
     let badRequestResponse = BadRequest;
     badRequestResponse.message = "Missing token";
@@ -24,7 +23,7 @@ module.exports.authorization = async (event, context, callback) => {
       informational("Authorization","Success","try_1","Successful authorization of " + policy.context.email);
       callback(null, policy);
     } catch (error) {
-      callback(null,error);
+      callback(error);
     }
   };
   
@@ -34,7 +33,6 @@ module.exports.authorization = async (event, context, callback) => {
       badRequestResponse.message = "Missing token";
       throw new Error(badRequest);
     } 
-
     const app_client_id = process.env.APP_CLIENT_ID;
     const sections = token.split(".");
     let authHeader = jose.util.base64url.decode(sections[0]);

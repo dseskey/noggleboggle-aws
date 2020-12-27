@@ -41,6 +41,7 @@ provider:
   # from the websocket event types on your function
   websocketApiRouteSelectionExpression: $request.body.action
 
+  useDotenv: true
 functions:
   # manage connection and disconnection of clients
   connectionManager:
@@ -48,8 +49,16 @@ functions:
     events:
       - websocket:
           route: $connect
+          authorizer:
+            name: "noggleBoggleAuthorization"
+            identitySource:
+              - "route.request.querystring.NBU"
       - websocket:
           route: $disconnect
+
+  #Authorization Function for Connect Route
+  noggleBoggleAuthorization:
+    handler: src/handlers/auth.authorization
 
   # just in case we are getting weird / bad data
   # we can react to it with a sane response

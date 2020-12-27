@@ -6,13 +6,17 @@
   "dependencies": {
     "aws-sdk": "^2.379.0",
     "bluebird": "^3.7.2",
+    "dotenv": "^8.2.0",
     "jsonwebtoken": "^8.5.1",
     "jwk-to-pem": "^2.0.4",
     "mongodb": "^3.5.9",
-    "node-fetch": "^2.6.0",
+    "node-fetch": "^2.6.1",
+    "node-jose": "^2.0.0",
     "sanitize-html": "^1.20.0"
   },
-  "devDependencies": {},
+  "devDependencies": {
+    "jest": "^26.6.3"
+  },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },

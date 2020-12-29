@@ -5,7 +5,7 @@ const mongoConnection = require('./mongo/mongoConnection').connectToDatabase;
 const processGameState = require('./utilities').processGameState;
 const addUserToGameDb = require('./mongo/mongoActions').addUserToGame;
 require('dotenv').config()
-const KEYS_URL = 'https://cognito-idp.'+process.env.AWS_REGION+'.amazonaws.com/'+process.env.USER_POOL_ID+'/.well-known/jwks.json';
+const KEYS_URL = 'https://cognito-idp.' + process.env.AWS_REGION + '.amazonaws.com/' + process.env.USER_POOL_ID + '/.well-known/jwks.json';
 const Bluebird = require("bluebird");
 const fetch = require("node-fetch");
 fetch.Promise = Bluebird;
@@ -30,16 +30,7 @@ const badRequest = {
 };
 
 
-async function connectionManager(event, context) {
-  // we do this so first connect EVER sets up some needed config state in db
-  // this goes away after CloudFormation support is added for web sockets
-  await wsClient._setupClient(event);
-  /*--End Verify Cognito Token--*/
-  
-  if (event.requestContext.eventType === "CONNECT") {
-    /*--Verify Cognito Token--*/
-    // console.log(event);
-
+async function createConnection(event, context) {
 
     let decryptedToken;
     let queryStringParameters = event.queryStringParameters;
@@ -94,7 +85,6 @@ async function connectionManager(event, context) {
             return invalidTokenResponse;
           } else {
             let message = "There was an error trying to load the game. Please try again later.";
-            console.log("HERE1");
             return internalServerError;
           }
         }
@@ -116,9 +106,7 @@ async function connectionManager(event, context) {
               context,
               userId
             );
-
-          }else{
-            console.log("HERE2")
+          } else {
             return internalServerError;
           }
 
@@ -130,26 +118,41 @@ async function connectionManager(event, context) {
       return badRequest;
     }
 
-
     return success;
+}
+
+async function destroyConnection(event, context) {
+  const subscriptions = await db.fetchConnectionSubscriptions(event);
+  const unsubscribes = subscriptions.map(async subscription =>
+    // just simulate / reuse the same as if they issued the request via the protocol
+    unsubscribeChannel(
+      {
+        ...event,
+        body: JSON.stringify({
+          action: "unsubscribe",
+          channelId: db.parseEntityId(subscription[db.Channel.Primary.Key])
+        })
+      },
+      context
+    )
+  );
+
+  await Promise.all(unsubscribes);
+}
+
+async function connectionManager(event, context) {
+  // we do this so first connect EVER sets up some needed config state in db
+  // this goes away after CloudFormation support is added for web sockets
+  await wsClient._setupClient(event);
+  /*--End Verify Cognito Token--*/
+
+  if (event.requestContext.eventType === "CONNECT") {
+   await createConnection(event,context);
+   return success;
+   
   } else if (event.requestContext.eventType === "DISCONNECT") {
     // unsub all channels connection was in
-    const subscriptions = await db.fetchConnectionSubscriptions(event);
-    const unsubscribes = subscriptions.map(async subscription =>
-      // just simulate / reuse the same as if they issued the request via the protocol
-      unsubscribeChannel(
-        {
-          ...event,
-          body: JSON.stringify({
-            action: "unsubscribe",
-            channelId: db.parseEntityId(subscription[db.Channel.Primary.Key])
-          })
-        },
-        context
-      )
-    );
-
-    await Promise.all(unsubscribes);
+   await destroyConnection(event,context);
     return success;
   }
 }
@@ -322,8 +325,7 @@ async function subscribeToGameChannel(event, context, userId) {
     TableName: db.Table,
     Item: {
       [db.Channel.Connections.Key]: `${db.Channel.Prefix}${channelId}`,
-      [db.Channel.Connections.Range]: `${db.Connection.Prefix}${
-        db.parseEntityId(event)
+      [db.Channel.Connections.Range]: `${db.Connection.Prefix}${db.parseEntityId(event)
         }`,
       [db.Channel.Connections.User]: `${db.User.Prefix}${userId}`
     }
@@ -342,8 +344,7 @@ async function subscribeChannel(event, context) {
     TableName: db.Table,
     Item: {
       [db.Channel.Connections.Key]: `${db.Channel.Prefix}${channelId}`,
-      [db.Channel.Connections.Range]: `${db.Connection.Prefix}${
-        db.parseEntityId(event)
+      [db.Channel.Connections.Range]: `${db.Connection.Prefix}${db.parseEntityId(event)
         }`
     }
   }).promise();
@@ -361,8 +362,7 @@ async function unsubscribeChannel(event, context) {
     TableName: db.Table,
     Key: {
       [db.Channel.Connections.Key]: `${db.Channel.Prefix}${channelId}`,
-      [db.Channel.Connections.Range]: `${db.Connection.Prefix}${
-        db.parseEntityId(event)
+      [db.Channel.Connections.Range]: `${db.Connection.Prefix}${db.parseEntityId(event)
         }`
     }
   }).promise();

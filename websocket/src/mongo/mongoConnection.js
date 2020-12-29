@@ -1,5 +1,5 @@
 const MongoClient = require('mongodb').MongoClient;
-const MONGODB_URI = '';
+require('dotenv').config()
 
 let cachedDb = null;
 
@@ -9,7 +9,7 @@ function connectToDatabase() {
             resolve(cachedDb);
         }
 
-        MongoClient.connect(MONGODB_URI, function (err, mongoDb) {
+        MongoClient.connect(process.env.MONGODB_URI, function (err, mongoDb) {
             if (err) {
                 console.log(err);
                 reject(err);

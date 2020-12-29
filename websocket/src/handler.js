@@ -4,7 +4,9 @@ const sanitize = require("sanitize-html");
 const mongoConnection = require('./mongo/mongoConnection').connectToDatabase;
 const processGameState = require('./utilities').processGameState;
 const addUserToGameDb = require('./mongo/mongoActions').addUserToGame;
-require('dotenv').config()
+require('dotenv').config();
+const {BadRequest, Unauthorized, InternalServerError} = require('./httpResponseSturctures');
+
 const KEYS_URL = 'https://cognito-idp.' + process.env.AWS_REGION + '.amazonaws.com/' + process.env.USER_POOL_ID + '/.well-known/jwks.json';
 const Bluebird = require("bluebird");
 const fetch = require("node-fetch");
@@ -159,9 +161,12 @@ async function connectionManager(event, context) {
 
 
 async function defaultMessage(event, context) {
+  let invalidActionTypeReponse = BadRequest;
+  invalidActionTypeReponse.message = "This action is not supported."
+
   await wsClient.send(event, {
     event: "error",
-    message: "invalid action type"
+    data: invalidActionTypeReponse
   });
 
   return success;

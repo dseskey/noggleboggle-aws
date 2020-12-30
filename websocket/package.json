@@ -12,6 +12,7 @@
     "mongodb": "^3.5.9",
     "node-fetch": "^2.6.1",
     "node-jose": "^2.0.0",
+    "randomstring": "^1.1.5",
     "sanitize-html": "^1.20.0"
   },
   "devDependencies": {

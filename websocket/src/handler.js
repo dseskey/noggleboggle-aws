@@ -6,12 +6,13 @@ const processGameState = require('./utilities').processGameState;
 const addUserToGameDb = require('./mongo/mongoActions').addUserToGame;
 require('dotenv').config();
 const {BadRequest, Unauthorized, InternalServerError} = require('./httpResponseSturctures');
+var randomstring = require("randomstring");
 
 const KEYS_URL = 'https://cognito-idp.' + process.env.AWS_REGION + '.amazonaws.com/' + process.env.USER_POOL_ID + '/.well-known/jwks.json';
 const Bluebird = require("bluebird");
 const fetch = require("node-fetch");
 fetch.Promise = Bluebird;
-
+var personCognitoContext = "hi";
 const wsClient = new ws.Client();
 
 const success = {
@@ -34,40 +35,9 @@ const badRequest = {
 
 async function createConnection(event, context) {
 
-    let decryptedToken;
     let queryStringParameters = event.queryStringParameters;
 
-    try {
-      // let token = event.headers['X-NBU'];
 
-      let token = queryStringParameters.NBU.split(',')[0];
-      if (!token) {
-        console.log("No Token Found");
-        return invalidTokenResponse;
-      }
-      const rawRes = await fetch(KEYS_URL);
-      const keyResponse = await rawRes.json();
-
-      var jwt = require('jsonwebtoken');
-      var jwkToPem = require('jwk-to-pem');
-      var pem = jwkToPem(keyResponse.keys[0]);
-
-      decryptedToken = jwt.verify(token, pem, { algorithms: ['RS256'] }, function (err, decodedToken) {
-        if (err) {
-          return undefined;
-        }
-        return decodedToken;
-      });
-    } catch (error) {
-      console.log("The Token Failed To Parse");
-      console.log(error);
-      return internalServerError;
-    }
-
-    if (decryptedToken == undefined) {
-      console.log("Token Not Present");
-      return invalidTokenResponse;
-    }
     let gameCode = queryStringParameters.GAME;
     if (gameCode) {
       // let gameCode = event.headers['X-GID'];
@@ -92,7 +62,7 @@ async function createConnection(event, context) {
         }
         else {
           //Add user to game, then subscribe the user to the channel
-          let userId = decryptedToken['cognito:username'];
+          let userId = event.requestContext.authorizer['cognito:username'];
 
           let addedUserToGame = await addUserToGame(mongoDb, gameDetails, userId);
           //Subscribe to the channel
@@ -149,6 +119,7 @@ async function connectionManager(event, context) {
   /*--End Verify Cognito Token--*/
 
   if (event.requestContext.eventType === "CONNECT") {
+
    await createConnection(event,context);
    return success;
    
@@ -214,8 +185,7 @@ async function sendMessage(event, context) {
     });
   });
 
-  await Promise.all(results);
-  return success;
+  await Promise.all(results);t
 }
 
 // oh my... this got out of hand refactor for sanity
@@ -224,6 +194,7 @@ async function broadcast(event, context) {
   // disconnections, messages, etc
   // get all connections for channel of interest
   // broadcast the news
+ 
   const results = event.Records.map(async record => {
     switch (record.dynamodb.Keys[db.Primary.Key].S.split("|")[0]) {
       // Connection entities
@@ -252,16 +223,17 @@ async function broadcast(event, context) {
               record.dynamodb.Keys[db.Primary.Key].S
             );
             const subscribers = await db.fetchChannelSubscriptions(channelId);
+           
             const results = subscribers.map(async subscriber => {
               const subscriberId = db.parseEntityId(
                 subscriber[db.Channel.Connections.Range]
               );
+              
               return wsClient.send(
                 subscriberId, // really backwards way of getting connection id
                 {
                   event: `subscriber_${eventType}`,
                   channelId,
-
                   // sender of message "from id"
                   subscriberId: db.parseEntityId(
                     record.dynamodb.Keys[db.Primary.Range].S

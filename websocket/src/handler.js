@@ -2,17 +2,11 @@ const db = require("./db");
 const ws = require("./websocket-client");
 const sanitize = require("sanitize-html");
 const mongoConnection = require('./mongo/mongoConnection').connectToDatabase;
-const processGameState = require('./utilities').processGameState;
 const addUserToGameDb = require('./mongo/mongoActions').addUserToGame;
 require('dotenv').config();
 const {BadRequest, Unauthorized, InternalServerError} = require('./httpResponseSturctures');
 var randomstring = require("randomstring");
 
-const KEYS_URL = 'https://cognito-idp.' + process.env.AWS_REGION + '.amazonaws.com/' + process.env.USER_POOL_ID + '/.well-known/jwks.json';
-const Bluebird = require("bluebird");
-const fetch = require("node-fetch");
-fetch.Promise = Bluebird;
-var personCognitoContext = "hi";
 const wsClient = new ws.Client();
 
 const success = {
@@ -34,7 +28,6 @@ const badRequest = {
 
 
 async function createConnection(event, context) {
-
     let queryStringParameters = event.queryStringParameters;
 
 
@@ -71,8 +64,7 @@ async function createConnection(event, context) {
               {
                 ...event,
                 body: JSON.stringify({
-                  action: "subscribe",
-                  channelId: gameCode,
+                  action: "subscribe"
                 })
               },
               context,
@@ -187,98 +179,6 @@ async function sendMessage(event, context) {
 
   await Promise.all(results);t
 }
-
-// oh my... this got out of hand refactor for sanity
-async function broadcast(event, context) {
-  // info from table stream, we'll learn about connections
-  // disconnections, messages, etc
-  // get all connections for channel of interest
-  // broadcast the news
- 
-  const results = event.Records.map(async record => {
-    switch (record.dynamodb.Keys[db.Primary.Key].S.split("|")[0]) {
-      // Connection entities
-      case db.Connection.Entity:
-        break;
-
-      // Channel entities (most stuff)
-      case db.Channel.Entity:
-        // figure out what to do based on full entity model
-
-        // get secondary ENTITY| type by splitting on | and looking at first part
-        switch (record.dynamodb.Keys[db.Primary.Range].S.split("|")[0]) {
-          // if we are a CONNECTION
-          case db.Connection.Entity: {
-            let eventType = "sub";
-            if (record.eventName === "REMOVE") {
-              eventType = "unsub";
-            } else if (record.eventName === "UPDATE") {
-              // currently not possible, and not handled
-              break;
-            }
-
-            // A connection event on the channel
-            // let all users know a connection was created or dropped
-            const channelId = db.parseEntityId(
-              record.dynamodb.Keys[db.Primary.Key].S
-            );
-            const subscribers = await db.fetchChannelSubscriptions(channelId);
-           
-            const results = subscribers.map(async subscriber => {
-              const subscriberId = db.parseEntityId(
-                subscriber[db.Channel.Connections.Range]
-              );
-              
-              return wsClient.send(
-                subscriberId, // really backwards way of getting connection id
-                {
-                  event: `subscriber_${eventType}`,
-                  channelId,
-                  // sender of message "from id"
-                  subscriberId: db.parseEntityId(
-                    record.dynamodb.Keys[db.Primary.Range].S
-                  )
-                }
-              );
-            });
-
-            await Promise.all(results);
-            break;
-          }
-
-          // If we are a MESSAGE
-          case db.Message.Entity: {
-            if (record.eventName !== "INSERT") {
-              return success;
-            }
-
-            // We could do interesting things like see if this was a bot
-            // or other system directly adding messages to the dynamodb table
-            // then send them out, otherwise assume it was already blasted out on the sockets
-            // and no need to send it again!
-            break;
-          }
-          default:
-            break;
-        }
-
-        break;
-      default:
-        break;
-    }
-  });
-
-  await Promise.all(results);
-  return success;
-}
-
-// module.exports.loadHistory = async (event, context) => {
-//   // only allow first page of history, otherwise this could blow up a table fast
-//   // pagination would be interesting to implement as an exercise!
-//   return await db.Client.query({
-//     TableName: db.Table
-//   }).promise();
-// };
 
 async function channelManager(event, context) {
   const action = JSON.parse(event.body).action;
@@ -401,7 +301,7 @@ module.exports = {
   connectionManager,
   defaultMessage,
   sendMessage,
-  broadcast,
+  // broadcast,
   subscribeChannel,
   unsubscribeChannel,
   channelManager,

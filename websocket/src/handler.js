@@ -2,13 +2,10 @@ const db = require("./db");
 const ws = require("./websocket-client");
 const sanitize = require("sanitize-html");
 const mongoConnection = require('./mongo/mongoConnection').connectToDatabase;
-const processGameState = require('./utilities').processGameState;
 const addUserToGameDb = require('./mongo/mongoActions').addUserToGame;
-require('dotenv').config()
-const KEYS_URL = 'https://cognito-idp.'+process.env.AWS_REGION+'.amazonaws.com/'+process.env.USER_POOL_ID+'/.well-known/jwks.json';
-const Bluebird = require("bluebird");
-const fetch = require("node-fetch");
-fetch.Promise = Bluebird;
+require('dotenv').config();
+const {BadRequest, Unauthorized, InternalServerError} = require('./httpResponseSturctures');
+var randomstring = require("randomstring");
 
 const wsClient = new ws.Client();
 
@@ -30,51 +27,10 @@ const badRequest = {
 };
 
 
-async function connectionManager(event, context) {
-  // we do this so first connect EVER sets up some needed config state in db
-  // this goes away after CloudFormation support is added for web sockets
-  await wsClient._setupClient(event);
-  /*--End Verify Cognito Token--*/
-  
-  if (event.requestContext.eventType === "CONNECT") {
-    /*--Verify Cognito Token--*/
-    // console.log(event);
-
-
-    let decryptedToken;
+async function createConnection(event, context) {
     let queryStringParameters = event.queryStringParameters;
 
-    try {
-      // let token = event.headers['X-NBU'];
 
-      let token = queryStringParameters.NBU.split(',')[0];
-      if (!token) {
-        console.log("No Token Found");
-        return invalidTokenResponse;
-      }
-      const rawRes = await fetch(KEYS_URL);
-      const keyResponse = await rawRes.json();
-
-      var jwt = require('jsonwebtoken');
-      var jwkToPem = require('jwk-to-pem');
-      var pem = jwkToPem(keyResponse.keys[0]);
-
-      decryptedToken = jwt.verify(token, pem, { algorithms: ['RS256'] }, function (err, decodedToken) {
-        if (err) {
-          return undefined;
-        }
-        return decodedToken;
-      });
-    } catch (error) {
-      console.log("The Token Failed To Parse");
-      console.log(error);
-      return internalServerError;
-    }
-
-    if (decryptedToken == undefined) {
-      console.log("Token Not Present");
-      return invalidTokenResponse;
-    }
     let gameCode = queryStringParameters.GAME;
     if (gameCode) {
       // let gameCode = event.headers['X-GID'];
@@ -94,13 +50,12 @@ async function connectionManager(event, context) {
             return invalidTokenResponse;
           } else {
             let message = "There was an error trying to load the game. Please try again later.";
-            console.log("HERE1");
             return internalServerError;
           }
         }
         else {
           //Add user to game, then subscribe the user to the channel
-          let userId = decryptedToken['cognito:username'];
+          let userId = event.requestContext.authorizer['cognito:username'];
 
           let addedUserToGame = await addUserToGame(mongoDb, gameDetails, userId);
           //Subscribe to the channel
@@ -109,16 +64,13 @@ async function connectionManager(event, context) {
               {
                 ...event,
                 body: JSON.stringify({
-                  action: "subscribe",
-                  channelId: gameCode,
+                  action: "subscribe"
                 })
               },
               context,
               userId
             );
-
-          }else{
-            console.log("HERE2")
+          } else {
             return internalServerError;
           }
 
@@ -130,35 +82,54 @@ async function connectionManager(event, context) {
       return badRequest;
     }
 
-
     return success;
+}
+
+async function destroyConnection(event, context) {
+  const subscriptions = await db.fetchConnectionSubscriptions(event);
+  const unsubscribes = subscriptions.map(async subscription =>
+    // just simulate / reuse the same as if they issued the request via the protocol
+    unsubscribeChannel(
+      {
+        ...event,
+        body: JSON.stringify({
+          action: "unsubscribe",
+          channelId: db.parseEntityId(subscription[db.Channel.Primary.Key])
+        })
+      },
+      context
+    )
+  );
+
+  await Promise.all(unsubscribes);
+}
+
+async function connectionManager(event, context) {
+  // we do this so first connect EVER sets up some needed config state in db
+  // this goes away after CloudFormation support is added for web sockets
+  await wsClient._setupClient(event);
+  /*--End Verify Cognito Token--*/
+
+  if (event.requestContext.eventType === "CONNECT") {
+
+   await createConnection(event,context);
+   return success;
+   
   } else if (event.requestContext.eventType === "DISCONNECT") {
     // unsub all channels connection was in
-    const subscriptions = await db.fetchConnectionSubscriptions(event);
-    const unsubscribes = subscriptions.map(async subscription =>
-      // just simulate / reuse the same as if they issued the request via the protocol
-      unsubscribeChannel(
-        {
-          ...event,
-          body: JSON.stringify({
-            action: "unsubscribe",
-            channelId: db.parseEntityId(subscription[db.Channel.Primary.Key])
-          })
-        },
-        context
-      )
-    );
-
-    await Promise.all(unsubscribes);
+   await destroyConnection(event,context);
     return success;
   }
 }
 
 
 async function defaultMessage(event, context) {
+  let invalidActionTypeReponse = BadRequest;
+  invalidActionTypeReponse.message = "This action is not supported."
+
   await wsClient.send(event, {
     event: "error",
-    message: "invalid action type"
+    data: invalidActionTypeReponse
   });
 
   return success;
@@ -206,99 +177,8 @@ async function sendMessage(event, context) {
     });
   });
 
-  await Promise.all(results);
-  return success;
+  await Promise.all(results);t
 }
-
-// oh my... this got out of hand refactor for sanity
-async function broadcast(event, context) {
-  // info from table stream, we'll learn about connections
-  // disconnections, messages, etc
-  // get all connections for channel of interest
-  // broadcast the news
-  const results = event.Records.map(async record => {
-    switch (record.dynamodb.Keys[db.Primary.Key].S.split("|")[0]) {
-      // Connection entities
-      case db.Connection.Entity:
-        break;
-
-      // Channel entities (most stuff)
-      case db.Channel.Entity:
-        // figure out what to do based on full entity model
-
-        // get secondary ENTITY| type by splitting on | and looking at first part
-        switch (record.dynamodb.Keys[db.Primary.Range].S.split("|")[0]) {
-          // if we are a CONNECTION
-          case db.Connection.Entity: {
-            let eventType = "sub";
-            if (record.eventName === "REMOVE") {
-              eventType = "unsub";
-            } else if (record.eventName === "UPDATE") {
-              // currently not possible, and not handled
-              break;
-            }
-
-            // A connection event on the channel
-            // let all users know a connection was created or dropped
-            const channelId = db.parseEntityId(
-              record.dynamodb.Keys[db.Primary.Key].S
-            );
-            const subscribers = await db.fetchChannelSubscriptions(channelId);
-            const results = subscribers.map(async subscriber => {
-              const subscriberId = db.parseEntityId(
-                subscriber[db.Channel.Connections.Range]
-              );
-              return wsClient.send(
-                subscriberId, // really backwards way of getting connection id
-                {
-                  event: `subscriber_${eventType}`,
-                  channelId,
-
-                  // sender of message "from id"
-                  subscriberId: db.parseEntityId(
-                    record.dynamodb.Keys[db.Primary.Range].S
-                  )
-                }
-              );
-            });
-
-            await Promise.all(results);
-            break;
-          }
-
-          // If we are a MESSAGE
-          case db.Message.Entity: {
-            if (record.eventName !== "INSERT") {
-              return success;
-            }
-
-            // We could do interesting things like see if this was a bot
-            // or other system directly adding messages to the dynamodb table
-            // then send them out, otherwise assume it was already blasted out on the sockets
-            // and no need to send it again!
-            break;
-          }
-          default:
-            break;
-        }
-
-        break;
-      default:
-        break;
-    }
-  });
-
-  await Promise.all(results);
-  return success;
-}
-
-// module.exports.loadHistory = async (event, context) => {
-//   // only allow first page of history, otherwise this could blow up a table fast
-//   // pagination would be interesting to implement as an exercise!
-//   return await db.Client.query({
-//     TableName: db.Table
-//   }).promise();
-// };
 
 async function channelManager(event, context) {
   const action = JSON.parse(event.body).action;
@@ -322,8 +202,7 @@ async function subscribeToGameChannel(event, context, userId) {
     TableName: db.Table,
     Item: {
       [db.Channel.Connections.Key]: `${db.Channel.Prefix}${channelId}`,
-      [db.Channel.Connections.Range]: `${db.Connection.Prefix}${
-        db.parseEntityId(event)
+      [db.Channel.Connections.Range]: `${db.Connection.Prefix}${db.parseEntityId(event)
         }`,
       [db.Channel.Connections.User]: `${db.User.Prefix}${userId}`
     }
@@ -342,8 +221,7 @@ async function subscribeChannel(event, context) {
     TableName: db.Table,
     Item: {
       [db.Channel.Connections.Key]: `${db.Channel.Prefix}${channelId}`,
-      [db.Channel.Connections.Range]: `${db.Connection.Prefix}${
-        db.parseEntityId(event)
+      [db.Channel.Connections.Range]: `${db.Connection.Prefix}${db.parseEntityId(event)
         }`
     }
   }).promise();
@@ -361,8 +239,7 @@ async function unsubscribeChannel(event, context) {
     TableName: db.Table,
     Key: {
       [db.Channel.Connections.Key]: `${db.Channel.Prefix}${channelId}`,
-      [db.Channel.Connections.Range]: `${db.Connection.Prefix}${
-        db.parseEntityId(event)
+      [db.Channel.Connections.Range]: `${db.Connection.Prefix}${db.parseEntityId(event)
         }`
     }
   }).promise();
@@ -424,7 +301,7 @@ module.exports = {
   connectionManager,
   defaultMessage,
   sendMessage,
-  broadcast,
+  // broadcast,
   subscribeChannel,
   unsubscribeChannel,
   channelManager,

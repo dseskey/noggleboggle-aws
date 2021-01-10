@@ -26,14 +26,31 @@ const getUserIdFromConnection = require('./utilities').getUserIdFromConnection;
           console.log("x = " + JSON.stringify(x));
           */
 
-async function join(event, context, callback) {
-    console.log(event);
-    const body = JSON.parse(event.body);
-    await wsClient._setupClient(event);
+// async function join(event, context, callback){
 
+// }          
+async function join(event, context, callback) {
+
+    const body = JSON.parse(event.body);
+    console.log("CALLBACK");
+    console.log(callback);
+    await wsClient._setupClient(event);
+    await db.Client.update({
+        TableName: db.Table,
+        Key: {
+            "pk": `${db.Connection.Prefix}${db.parseEntityId(event)            }`,
+            "sk": `${db.User.Prefix}${event.requestContext.authorizer['cognito:username']}`
+        },
+       UpdateExpression: "set gameId = :gameId",
+       ExpressionAttributeValues: {
+           ":gameId": `${db.Channel.Prefix}${body.payload.gameId}`
+       }
+      }).promise();
+    
 
     //GEt Game ID and user ID from connetion
     let gameAndUserIdStatus = await getUserAndGameIdFromConnection(event);
+    // let gameAndUserIdStatus = {status: 'success', userId: event.requestContext.authorizer['cognito:username'], gameId: body.payload.gameId}
     if (!gameAndUserIdStatus.status == 'success') {
         let message = gameAndUserIdStatus.message;
         console.log('==> Error getting user ID and game ID ' + JSON.stringify(error));
@@ -60,15 +77,16 @@ async function join(event, context, callback) {
                     message
                 });
             }
-            const gameDetails = await queryDatabaseForGameCode(mongoDb, gameId);
+            const gameDetails = await queryDatabaseForGameCode(mongoDb, "5ffb3792473e9129a338b048");
             if (gameDetails.statusCode) {
                 if (gameDetails.statusCode == 400) {
                     let message = "Could not find a game with the provided game code.";
-                    return wsClient.send(event, {
+                     let x = await wsClient.send(event, {
                         event: "game-status-error",
                         channelId: body.channelId,
                         message
                     });
+                    return success;
 
                 } else {
                     let message = "There was an error trying to load the game. Please try again later.";

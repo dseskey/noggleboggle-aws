@@ -64,7 +64,8 @@ async function createConnection(event, context) {
               {
                 ...event,
                 body: JSON.stringify({
-                  action: "subscribe"
+                  action: "subscribe",
+                  channelId: randomstring.generate(24)
                 })
               },
               context,
@@ -86,23 +87,20 @@ async function createConnection(event, context) {
 }
 
 async function destroyConnection(event, context) {
-  const subscriptions = await db.fetchConnectionSubscriptions(event);
-  const unsubscribes = subscriptions.map(async subscription =>
-    // just simulate / reuse the same as if they issued the request via the protocol
-    unsubscribeChannel(
-      {
-        ...event,
-        body: JSON.stringify({
-          action: "unsubscribe",
-          channelId: db.parseEntityId(subscription[db.Channel.Primary.Key])
-        })
-      },
-      context
-    )
-  );
 
-  await Promise.all(unsubscribes);
+  const item = await db.Client.delete({
+    TableName: db.Table,
+    Key: {
+      [db.Channel.Connections.Key]: `${db.Connection.Prefix}${db.parseEntityId(event)
+      }`,
+      [db.Channel.Connections.Range]: `${db.User.Prefix}${event.requestContext.authorizer['cognito:username']}`    
+        }
+  }).promise();
+  
+  return success;
+  
 }
+
 
 async function connectionManager(event, context) {
   // we do this so first connect EVER sets up some needed config state in db
@@ -201,10 +199,10 @@ async function subscribeToGameChannel(event, context, userId) {
   await db.Client.put({
     TableName: db.Table,
     Item: {
-      [db.Channel.Connections.Key]: `${db.Channel.Prefix}${channelId}`,
-      [db.Channel.Connections.Range]: `${db.Connection.Prefix}${db.parseEntityId(event)
+      [db.Channel.Connections.Key]: `${db.Connection.Prefix}${db.parseEntityId(event)
         }`,
-      [db.Channel.Connections.User]: `${db.User.Prefix}${userId}`
+        [db.Channel.Connections.Range]: `${db.User.Prefix}${userId}`,
+      [db.Channel.Connections.User]: `${db.Channel.Prefix}${channelId}`
     }
   }).promise();
 

@@ -34,7 +34,7 @@ const getUserIdFromConnection = require('./utilities').getUserIdFromConnection;
 async function join(event, context, callback) {
 
     const body = JSON.parse(event.body);
-    const gameId = body.gameId;
+    const gameId = body.payload.gameId;
     const userId = event.requestContext.authorizer['cognito:username'];
 
     try {
@@ -59,6 +59,7 @@ async function join(event, context, callback) {
         }
 
         const gameDetails = await queryDatabaseForGameCode(mongoDb, gameId);
+        console.log(gameDetails);
         if (gameDetails.statusCode) {
             if (gameDetails.statusCode == 400) {
                 error("joinGame","join","queryForGame", "Could not find a game with the provided game code" + gameId);

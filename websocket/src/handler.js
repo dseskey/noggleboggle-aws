@@ -4,7 +4,7 @@ const sanitize = require("sanitize-html");
 const mongoConnection = require('./mongo/mongoConnection').connectToDatabase;
 const addUserToGameDb = require('./mongo/mongoActions').addUserToGame;
 require('dotenv').config();
-const {BadRequest, Unauthorized, InternalServerError} = require('./httpResponseSturctures');
+const { BadRequest, Unauthorized, InternalServerError } = require('./httpResponseSturctures');
 var randomstring = require("randomstring");
 
 const wsClient = new ws.Client();
@@ -28,62 +28,80 @@ const badRequest = {
 
 
 async function createConnection(event, context) {
-    let queryStringParameters = event.queryStringParameters;
 
+  /*--The authorizer has already obtained the Cognito info, use it to create a connection WITHOUT a channel (a channel is a game which we do not take at connect)--*/
+  let userId = event.requestContext.authorizer['cognito:username'];
 
-    let gameCode = queryStringParameters.GAME;
-    if (gameCode) {
-      // let gameCode = event.headers['X-GID'];
-      try {
-        var mongoDb;
-        try {
-          mongoDb = await mongoConnection();
-        } catch (error) {
-          let message = "Error connecting to the game database."
-          console.log('==> Error connecting to MongoDb: ' + JSON.stringify(error));
-          return internalServerError;
-        }
-        const gameDetails = await queryDatabaseForGameCode(mongoDb, gameCode);
-        if (gameDetails.statusCode) {
-          if (gameDetails.statusCode == 400) {
-            let message = "Could not find a game with the provided game code.";
-            return invalidTokenResponse;
-          } else {
-            let message = "There was an error trying to load the game. Please try again later.";
-            return internalServerError;
-          }
-        }
-        else {
-          //Add user to game, then subscribe the user to the channel
-          let userId = event.requestContext.authorizer['cognito:username'];
-
-          let addedUserToGame = await addUserToGame(mongoDb, gameDetails, userId);
-          //Subscribe to the channel
-          if (addedUserToGame) {
-            await subscribeToGameChannel(
-              {
-                ...event,
-                body: JSON.stringify({
-                  action: "subscribe",
-                  channelId: randomstring.generate(24)
-                })
-              },
-              context,
-              userId
-            );
-          } else {
-            return internalServerError;
-          }
-
-        }
-      } catch (err) {
-        console.error(err);
-      }
-    } else {
-      return badRequest;
+  // const channelId = JSON.parse(event.body).channelId;
+  await db.Client.put({
+    TableName: db.Table,
+    Item: {
+      [db.Channel.Connections.Key]: `${db.Connection.Prefix}${db.parseEntityId(event)
+        }`,
+      [db.Channel.Connections.Range]: `${db.User.Prefix}${userId}`,
+      [db.Channel.Connections.User]: `${db.Channel.Prefix}''`
     }
+  }).promise();
 
-    return success;
+  // Instead of broadcasting here we listen to the dynamodb stream
+  // just a fun example of flexible usage
+  // you could imagine bots or other sub systems broadcasting via a write the db
+  // and then streams does the rest
+  return success;
+
+  // let gameCode = queryStringParameters.GAME;
+  // if (gameCode) {
+  //   // let gameCode = event.headers['X-GID'];
+  //   try {
+  //     var mongoDb;
+  //     try {
+  //       mongoDb = await mongoConnection();
+  //     } catch (error) {
+  //       let message = "Error connecting to the game database."
+  //       console.log('==> Error connecting to MongoDb: ' + JSON.stringify(error));
+  //       return internalServerError;
+  //     }
+  //     const gameDetails = await queryDatabaseForGameCode(mongoDb, gameCode);
+  //     if (gameDetails.statusCode) {
+  //       if (gameDetails.statusCode == 400) {
+  //         let message = "Could not find a game with the provided game code.";
+  //         return invalidTokenResponse;
+  //       } else {
+  //         let message = "There was an error trying to load the game. Please try again later.";
+  //         return internalServerError;
+  //       }
+  //     }
+  //     else {
+  //       //Add user to game, then subscribe the user to the channel
+  //       let userId = event.requestContext.authorizer['cognito:username'];
+
+  //       let addedUserToGame = await addUserToGame(mongoDb, gameDetails, userId);
+  //       //Subscribe to the channel
+  //       if (addedUserToGame) {
+  //         await subscribeToGameChannel(
+  //           {
+  //             ...event,
+  //             body: JSON.stringify({
+  //               action: "subscribe",
+  //               channelId: randomstring.generate(24)
+  //             })
+  //           },
+  //           context,
+  //           userId
+  //         );
+  //       } else {
+  //         return internalServerError;
+  //       }
+
+  //     }
+  //   } catch (err) {
+  //     console.error(err);
+  //   }
+  // } else {
+  //   return badRequest;
+  // }
+
+  // return success;
 }
 
 async function destroyConnection(event, context) {
@@ -92,13 +110,13 @@ async function destroyConnection(event, context) {
     TableName: db.Table,
     Key: {
       [db.Channel.Connections.Key]: `${db.Connection.Prefix}${db.parseEntityId(event)
-      }`,
-      [db.Channel.Connections.Range]: `${db.User.Prefix}${event.requestContext.authorizer['cognito:username']}`    
-        }
+        }`,
+      [db.Channel.Connections.Range]: `${db.User.Prefix}${event.requestContext.authorizer['cognito:username']}`
+    }
   }).promise();
-  
+
   return success;
-  
+
 }
 
 
@@ -110,12 +128,12 @@ async function connectionManager(event, context) {
 
   if (event.requestContext.eventType === "CONNECT") {
 
-   await createConnection(event,context);
-   return success;
-   
+    await createConnection(event, context);
+    return success;
+
   } else if (event.requestContext.eventType === "DISCONNECT") {
     // unsub all channels connection was in
-   await destroyConnection(event,context);
+    await destroyConnection(event, context);
     return success;
   }
 }
@@ -175,7 +193,7 @@ async function sendMessage(event, context) {
     });
   });
 
-  await Promise.all(results);t
+  await Promise.all(results); t
 }
 
 async function channelManager(event, context) {
@@ -201,7 +219,7 @@ async function subscribeToGameChannel(event, context, userId) {
     Item: {
       [db.Channel.Connections.Key]: `${db.Connection.Prefix}${db.parseEntityId(event)
         }`,
-        [db.Channel.Connections.Range]: `${db.User.Prefix}${userId}`,
+      [db.Channel.Connections.Range]: `${db.User.Prefix}${userId}`,
       [db.Channel.Connections.User]: `${db.Channel.Prefix}${channelId}`
     }
   }).promise();

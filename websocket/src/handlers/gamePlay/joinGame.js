@@ -1,11 +1,13 @@
 
 
-const db = require("../db");
-const ws = require("../websocket-client");
+const db = require("../../db");
+const ws = require("../../websocket-client");
 const sanitize = require("sanitize-html");
-const mongoConnection = require('../mongo/mongoConnection').connectToDatabase;
-const processGameState = require('../utilities').processGameState;
-const getUserAndGameIdFromConnection = require('../utilities').getUserAndGameIdFromConnection;
+const mongoConnection = require('../../mongo/mongoConnection').connectToDatabase;
+const processGameState = require('../../utilities').processGameState;
+const getUserAndGameIdFromConnection = require('../../utilities').getUserAndGameIdFromConnection;
+const { BadRequest, Unauthorized, InternalServerError } = require('../../httpResponseSturctures');
+const {informational, error, warning}  = require('../../logging/log');
 
 "use strict";
 
@@ -32,8 +34,118 @@ const getUserIdFromConnection = require('./utilities').getUserIdFromConnection;
 async function join(event, context, callback) {
 
     const body = JSON.parse(event.body);
-    console.log("CALLBACK");
-    console.log(callback);
+    const gameId = body.gameId;
+    const userId = event.requestContext.authorizer['cognito:username'];
+
+    try {
+        var mongoDb;
+        try {
+            mongoDb = await mongoConnection();
+        } catch (error) {
+            error("joinGame","join","database_connection",JSON.stringify(error));
+            let dbConnectionError = InternalServerError;
+            dbConnectionError.message = "Error contacting the game database";
+             let isMessageSent = wsClient.send(event, {
+                event: "game-status-error",
+                channelId: body.channelId,
+                payload: dbConnectionError
+            });
+
+            if(isMessageSent){
+                return success;
+            }else{
+                return fail500;
+            }
+        }
+
+        const gameDetails = await queryDatabaseForGameCode(mongoDb, gameId);
+        if (gameDetails.statusCode) {
+            if (gameDetails.statusCode == 400) {
+                error("joinGame","join","queryForGame", "Could not find a game with the provided game code" + gameId);
+                let gameNotFoundError = BadRequest;
+                gameNotFoundError.message = "Could not find a game with the provided game code.";
+                 let isMessageSent = await wsClient.send(event, {
+                    event: "game-status-error",
+                    channelId: body.channelId,
+                    payload: gameNotFoundError
+                });
+
+                if(isMessageSent){
+                    return success;
+                }else{
+                    return fail500;
+                }
+
+            } else {
+                error("joinGame","join","queryGameProcessError",JSON.stringify(error));
+                let dbProcessError = InternalServerError;
+                dbProcessError.message = "There was an error trying to load the game. Please try again later.";
+                 let isMessageSent = wsClient.send(event, {
+                    event: "game-status-error",
+                    channelId: body.channelId,
+                    payload: dbProcessError
+                });
+    
+                if(isMessageSent){
+                    return success;
+                }else{
+                    return fail500;
+                }
+            }
+        }
+        else {
+            if (!(userId == gameDetails.owner)) {
+                var gameStatusForUser;
+                try {
+                    gameStatusForUser = await getGameStatus(mongoDb, gameDetails, userId);
+                    if (gameStatusForUser.status) {
+                        let message = gameStatusForUser.message;
+                        return wsClient.send(event, {
+                            event: "game-status-error",
+                            channelId: gameId,
+                            message
+                        });
+                    } else {
+                        return wsClient.send(event, {
+                            event: "game-status-success",
+                            channelId: gameId,
+                            gameStatusForUser
+                        }, userId);
+                    }
+                } catch (error) {
+                    console.log('=> ERROR GETTING GAME');
+                    console.log(error);
+                    let message = error.message;
+                    return wsClient.send(event, {
+                        event: "game-status-error",
+                        channelId: gameId,
+                        message
+                    }
+                    );
+                }
+            }else{
+                let responseObj = {
+                    message: "Game master has successfully joined the game.",
+                    currentQuestion: gameDetails.questionDetail.currentQuestion,
+                    isOpen: gameDetails.isOpen,
+                    isComplete: gameDetails.isComplete,
+                    isStarted: gameDetails.isStarted
+                }
+                return wsClient.send(event, {
+                    event: "game-status-success",
+                    channelId: gameId,
+                    responseObj
+                }, userId);
+            }
+        }
+    } catch (err) {
+        console.error(err);
+    }
+
+    //Look up game ID in database
+    //Check if user is owner
+        //if owner return owner joined game
+        //if not owner add user to game and return status
     await wsClient._setupClient(event);
     await db.Client.update({
         TableName: db.Table,
@@ -47,10 +159,12 @@ async function join(event, context, callback) {
        }
       }).promise();
     
-
+      return success;
     //GEt Game ID and user ID from connetion
+
+
+    /*
     let gameAndUserIdStatus = await getUserAndGameIdFromConnection(event);
-    // let gameAndUserIdStatus = {status: 'success', userId: event.requestContext.authorizer['cognito:username'], gameId: body.payload.gameId}
     if (!gameAndUserIdStatus.status == 'success') {
         let message = gameAndUserIdStatus.message;
         console.log('==> Error getting user ID and game ID ' + JSON.stringify(error));
@@ -149,7 +263,7 @@ async function join(event, context, callback) {
         // return success;
     }
 
-
+*/
 }
 
 async function getGameStatus(mongoDb, gameDetails, userId) {

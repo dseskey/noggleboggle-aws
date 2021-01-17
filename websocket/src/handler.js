@@ -1,8 +1,6 @@
 const db = require("./db");
 const ws = require("./websocket-client");
 const sanitize = require("sanitize-html");
-const mongoConnection = require('./mongo/mongoConnection').connectToDatabase;
-const addUserToGameDb = require('./mongo/mongoActions').addUserToGame;
 require('dotenv').config();
 const { BadRequest, Unauthorized, InternalServerError } = require('./httpResponseSturctures');
 var randomstring = require("randomstring");
@@ -261,31 +259,6 @@ async function unsubscribeChannel(event, context) {
   }).promise();
   return success;
 }
-
-async function addUserToGame(mongoDb, gameDetails, userId) {
-
-  //Subscribe to the channel
-  let processedGameState = {};
-  let foundUser = gameDetails.players.filter(player => player.playerId == userId);
-  if (foundUser < 1) {
-    //If the user doesn't exist in the game yet, register them.
-    gameDetails.players.push({ playerId: userId, totalPoints: 0, answers: [] });
-    try {
-      let addUserStatus = await addUserToGameDb(mongoDb, gameDetails);
-      return true;
-
-    } catch (error) {
-      return false;
-      // return { "status": "error", "message": "There was an error adding you to the game. Please try again." };
-    }
-  } else {
-    return true;
-  }
-
-}
-
-
-
 
 var ObjectId = require('mongodb').ObjectId;
 

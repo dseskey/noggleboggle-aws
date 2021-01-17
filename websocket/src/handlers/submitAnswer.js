@@ -1,15 +1,17 @@
 
 
+"use strict";
+
 const db = require("../db");
 const ws = require("../websocket-client");
 const sanitize = require("sanitize-html");
-"use strict";
 const mongoConnection = require('../mongo/mongoConnection').connectToDatabase;
 const getGameDetails = require('../mongo/mongoActions').queryDatabaseForGameCode;
 const submitAnswerToDataBase = require('../mongo/mongoActions').submitAnswerToDataBase;
 const getUserAndGameIdFromConnection = require('../utilities').getUserAndGameIdFromConnection;
+const {informational, error, warning} = require('../logging/log');
+const getGameIdFromConnection = require('../utilities').getGameIdFromConnection;
 
-let cachedDb = null;
 const wsClient = new ws.Client();
 
 const success = {
@@ -24,11 +26,14 @@ const fail500 = {
 
 async function submit(event, context, callback) {
 
+    const body = JSON.parse(event.body);
+    const questionSubmission = body.payload;
+    const userId = event.requestContext.authorizer['cognito:username'];
 
     // {"questionId":0, "answer":1, "type": "multipleChoice"}
-    const body = JSON.parse(event.body);
-    const payload = body.payload;
-    const questionSubmission = payload;
+console.log("BEFORE GAME ID")
+await getGameIdFromConnection(event);
+console.log("AFTER get ID")
     try {
         let gameAndUserIdStatus = await getUserAndGameIdFromConnection(event);
         if (!gameAndUserIdStatus.status == 'success') {

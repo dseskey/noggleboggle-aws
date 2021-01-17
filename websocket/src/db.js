@@ -103,6 +103,7 @@ async function fetchConnectionSubscriptions(connection){
 }
 
 async function fetchChannelSubscriptions(channel){
+
     const channelId = parseEntityId(channel)
     const results = await ddb.query({
         TableName: db.Table,
@@ -120,12 +121,30 @@ async function fetchChannelSubscriptions(channel){
       return results.Items;
 }
 
+async function updateChannelId(event, gameId){
+    const body = JSON.parse(event.body);
+    let x = await ddb.update({
+        TableName: db.Table,
+        Key: {
+            "pk": `${db.Connection.Prefix}${parseEntityId(event)            }`,
+            "sk": `${db.User.Prefix}${event.requestContext.authorizer['cognito:username']}`
+        },
+       UpdateExpression: "set gameId = :gameId",
+       ExpressionAttributeValues: {
+           ":gameId": `${db.Channel.Prefix}${gameId}`
+       }
+      }).promise();
+
+      console.log(x);
+      return x;
+}
 
 const client = {
     ...db,
     parseEntityId,
     fetchConnectionSubscriptions,
     fetchChannelSubscriptions,
+    updateChannelId,
     Client: ddb
 }
 

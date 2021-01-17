@@ -100,6 +100,7 @@ async function join(event, context, callback) {
                         return fail500;
                     }
                 } else {
+                    await db.updateChannelId(event,gameId);
                     let playerResponseObject = Success;
                     playerResponseObject.payload = gameStatusForUser;
                     let isMessageSent = await wsClient.send(event, {
@@ -116,6 +117,7 @@ async function join(event, context, callback) {
                 }
             } else {
                 /*--Game Master Joining--*/
+                await db.updateChannelId(event,gameId);
                 let gameMasterResponseObject = Success;
                 gameMasterResponseObject.payload = {
                     message: "Game master has successfully joined the game.",
@@ -143,6 +145,7 @@ async function join(event, context, callback) {
     }
 
 }
+
 
 async function getGameStatusForJoining(mongoDb, gameDetails, userId) {
 

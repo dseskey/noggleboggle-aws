@@ -84,7 +84,7 @@ functions:
 
   # joinGame
   joinGame:
-    handler: src/handlers/joinGame.join
+    handler: src/handlers/gamePlay/joinGame.join
     events:
       - websocket:
           route: joinGame

@@ -28,24 +28,25 @@ async function broadcaster(event, context) {
   // disconnections, messages, etc
   // get all connections for channel of interest
   // broadcast the news
-  
   const results = event.Records.map(async record => {
     let connectionId = null; //Used if and only if this is a first connection attempt.
     switch (record.dynamodb.Keys[db.Primary.Key].S.split("|")[0]) {
       // Connection entities
-      case db.Connection.Entity:
+      case db.Channel.Entity:
+
         break;
 
       // Channel entities (most stuff)
-      case db.Channel.Entity:
+      case db.Connection.Entity:
         // figure out what to do based on full entity model
-
+console.log('hello1')
         // get secondary ENTITY| type by splitting on | and looking at first part
-        switch (record.dynamodb.Keys[db.Primary.Range].S.split("|")[0]) {
+        switch (record.dynamodb.Keys[db.Primary.Key].S.split("|")[0]) {
           // if we are a CONNECTION
           case db.Connection.Entity: {
             let eventType = "sub";
-            connectionId = event.Records[0].dynamodb.Keys.sk.S.split("|")[1];
+            connectionId = event.Records[0].dynamodb.Keys.pk.S.split("|")[1];
+            
             if (record.eventName === "REMOVE") {
               eventType = "unsub";
             } else if (record.eventName === "UPDATE") {
@@ -59,26 +60,42 @@ async function broadcaster(event, context) {
               record.dynamodb.Keys[db.Primary.Key].S
             );
             const subscribers = await db.fetchChannelSubscriptions(channelId);
-           
-            const results = subscribers.map(async subscriber => {
-              const subscriberId = db.parseEntityId(
-                subscriber[db.Channel.Connections.Range]
-              );
-              
+           console.log("SUBSCRIBERS");
+           console.log(subscribers);
+            // const results = subscribers.map(async subscriber => {
+            //   const subscriberId = db.parseEntityId(
+            //     subscriber[db.Channel.Connections.Range]
+            //   );
+            //   console.log("CONN ID");
+            // console.log(connectionId);
+            //   return wsClient.send(
+            //     (connectionId != null ? connectionId : subscriberId), // really backwards way of getting connection id
+            //     {
+            //       event: `subscriber_${eventType}`,
+            //       channelId,
+            //       // sender of message "from id"
+            //       subscriberId: db.parseEntityId(
+            //         record.dynamodb.Keys[db.Primary.Key].S
+            //       )
+            //     }
+            //   );
+            // });
+            console.log("CONN ID");
+            console.log(connectionId);
               return wsClient.send(
-                (connectionId != null ? connectionId : subscriberId), // really backwards way of getting connection id
+                connectionId, 
                 {
                   event: `subscriber_${eventType}`,
                   channelId,
                   // sender of message "from id"
                   subscriberId: db.parseEntityId(
-                    record.dynamodb.Keys[db.Primary.Range].S
+                    record.dynamodb.Keys[db.Primary.Key].S
                   )
                 }
               );
-            });
 
-            await Promise.all(results);
+            // await Promise.all(results);
+            console.log('YAYA')
             break;
           }
 
@@ -95,11 +112,15 @@ async function broadcaster(event, context) {
             break;
           }
           default:
+            console.log('hello2')
+
             break;
         }
 
         break;
       default:
+        console.log('hello3')
+
         break;
     }
   });

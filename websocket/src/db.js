@@ -6,19 +6,19 @@ const db = {
     Primary: {
         Key: 'pk',
         Range: 'sk',
-        User: 'tk'
+        User: 'gameId'
     },
     Connection: {
         Primary: {
             Key: 'pk',
             Range: 'sk',
-            User: 'tk'
+            User: 'gameId'
         },
         Channels: {
             Index: 'reverse',
             Key: 'sk',
             Range: 'pk',
-            User: 'tk'
+            User: 'gameId'
         },
         Prefix: 'CONNECTION|',
         Entity: 'CONNECTION'
@@ -27,17 +27,17 @@ const db = {
         Primary: {
             Key: 'pk',
             Range: 'sk',
-            User: 'tk'
+            User: 'gameId'
         },
         Connections: {
             Key: 'pk',
             Range: 'sk',
-            User: 'tk'
+            User: 'gameId'
         },
         Messages: {
             Key: 'pk',
             Range: 'sk',
-            User: 'tk'
+            User: 'gameId'
         },
         Prefix: 'CHANNEL|',
         Entity: 'CHANNEL'
@@ -46,7 +46,7 @@ const db = {
         Primary: {
             Key: 'pk',
             Range: 'sk',
-            User: 'tk'
+            User: 'gameId'
         },
         Prefix: 'USER|',
         Entity: 'USER'
@@ -73,10 +73,9 @@ function parseEntityId(target){
         target = target.requestContext.connectionId;
     } else {
         // strip prefix if set so we always get raw id
-        target = target
+        target = target.replace(connectionRegex, '').replace(userRegex, '')
                 .replace(channelRegex, '')
-                .replace(messageRegex, '')
-                .replace(connectionRegex, '').replace(userRegex, '');
+                .replace(messageRegex, '');
     }
 
     return target.replace('|', ''); // why?!

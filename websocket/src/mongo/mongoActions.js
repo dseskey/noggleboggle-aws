@@ -1,3 +1,5 @@
+const { informational, error, warning } = require('../logging/log');
+
 var ObjectId = require('mongodb').ObjectId;
 
 convertToObjectId = (idString) => {
@@ -23,7 +25,8 @@ function queryDatabaseForGameCode(mongoDb, gameId) {
         });
 }
 
-function addUserToGame(mongoDb, gameDetails, userID) {
+function addUserToGame(mongoDb, gameDetails, userId) {
+    gameDetails.players.push({ playerId: userId, totalPoints: 0, answers: [] });
 
     return new Promise((resolve, reject) => {
         let gamesCollection = mongoDb.collection('games');
@@ -32,7 +35,7 @@ function addUserToGame(mongoDb, gameDetails, userID) {
             gamesCollection.updateOne({ _id: gameDetails._id }, { $set: { players: gameDetails.players } });
             resolve({ status: "success", message: "The user was added to the game successfully." });
         } catch (error) {
-            console.log(error)
+            error('mongoActions','addUserToGame',"updateOneError", JSON.stringify(error));
             reject({ status: "error", message: 'There was an error accessing the games collection for updating game details.', error: error });
         }
     })

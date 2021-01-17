@@ -7,7 +7,6 @@ function processGameState(gameDetails) {
         return { 'gameStatus': "not-open" };
     }
     if (gameDetails.isComplete) {
-        //return the game isn't started
         return { 'gameStatus': "complete" };
     }
     if (gameDetails.isOpen && !gameDetails.isComplete) {
@@ -54,6 +53,7 @@ async function getUserIdFromConnection(event) {
 
 
 }
+
 
 async function getUserAndGameIdFromConnection(event) {
 

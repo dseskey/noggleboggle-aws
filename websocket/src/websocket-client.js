@@ -57,6 +57,8 @@ class Client {
     async send(connection, payload){
         // Cheat and allow event to be passed in
         // this also lets us default to setupClient too
+        
+        try{
         await this._setupClient(connection)
         let ConnectionId = connection;
         if(typeof connection === 'object'){
@@ -92,6 +94,10 @@ class Client {
         });
 
         return true;
+        }catch(error){
+            console.log("ERROR: ");
+            console.log(error);
+        }
     }
 }
 

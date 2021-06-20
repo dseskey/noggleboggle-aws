@@ -24,26 +24,15 @@ function processGameState(gameDetails) {
 }
 
 async function getGameIdFromConnection(event) {
-
-    const subscriptions = await db.fetchConnectionSubscriptions(event);
-    if (subscriptions.length > 1) {
-        return ({ status: "error", message: "You are currently participating in more than one game, please disconnect from all games but one to continue." })
-    }else if (subscriptions.length == 0) {
-        return ({ status: "error", message: "You are currently not participating in any games, please join a game to continue." })
-    } else {
-        const subscription = subscriptions[0];
-        return ({ status: "success", gameId: db.parseEntityId(subscription[db.Channel.Primary.Key]) });
-    }
-
-
+    const channel = await db.getChannelIdFromConnection(event);
+    return channel.replace(db.Channel.Prefix,"");
 }
 
 async function getUserIdFromConnection(event) {
-
     const subscriptions = await db.fetchConnectionSubscriptions(event);
     if (subscriptions.length > 1) {
         return ({ status: "error", message: "You are currently participating in more than one game, please disconnect from all games but one to continue." })
-    }else if (subscriptions.length == 0) {
+    } else if (subscriptions.length == 0) {
         return ({ status: "error", message: "You are currently not participating in any games, please join a game to continue." })
     } else {
         const subscription = subscriptions[0];
@@ -54,18 +43,21 @@ async function getUserIdFromConnection(event) {
 
 }
 
-
 async function getUserAndGameIdFromConnection(event) {
-
-    const subscriptions = await db.fetchConnectionSubscriptions(event);
-    if (subscriptions.length > 1) {
-        return ({ status: "error", message: "You are currently participating in more than one game, please disconnect from all games but one to continue." })
-    }else if (subscriptions.length == 0) {
-        return ({ status: "error", message: "You are currently not participating in any games, please join a game to continue." })
-    } else {
-        const subscription = subscriptions[0];
-        console.log('PARSING ID')
-        return ({ status: "success", userId: db.parseEntityId(subscription[db.Channel.Primary.User]), gameId: db.parseEntityId(subscription[db.Channel.Primary.Key])});
+    console.log('HERERERE');
+    try {
+        const subscriptions = await db.fetchConnectionSubscriptions(event);
+        if (subscriptions.length > 1) {
+            return ({ status: "error", message: "You are currently participating in more than one game, please disconnect from all games but one to continue." })
+        } else if (subscriptions.length == 0) {
+            return ({ status: "error", message: "You are currently not participating in any games, please join a game to continue." })
+        } else {
+            const subscription = subscriptions[0];
+            console.log('PARSING ID')
+            return ({ status: "success", userId: db.parseEntityId(subscription[db.Channel.Primary.Range]), gameId: db.parseEntityId(subscription[db.Channel.Primary.User]) });
+        }
+    } catch (e) {
+        console.log(e);
     }
 
 

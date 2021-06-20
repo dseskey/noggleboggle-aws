@@ -22,6 +22,7 @@ provider:
         - "dynamodb:BatchGetItem"
         - "dynamodb:BatchWriteItem"
         - "dynamodb:Query"
+        - "dynamodb:Scan"
       Resource:
         - Fn::GetAtt: [ApplicationDynamoDBTable, Arn]
         - Fn::Join:
@@ -77,7 +78,7 @@ functions:
 
   # submitAnswer
   submitAnswer:
-    handler: src/handlers/submitAnswer.submit
+    handler: src/handlers/gamePlay/submitAnswer.submit
     events:
       - websocket:
           route: submitAnswer
@@ -91,7 +92,7 @@ functions:
 
   # nextQuestion
   nextQuestion:
-    handler: src/handlers/nextQuestion.next
+    handler: src/handlers/gameManagement/nextQuestion.next
     events:
       - websocket:
           route: nextQuestion

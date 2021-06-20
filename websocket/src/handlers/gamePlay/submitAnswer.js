@@ -2,15 +2,15 @@
 
 "use strict";
 
-const db = require("../db");
-const ws = require("../websocket-client");
+const db = require("../../db");
+const ws = require("../../websocket-client");
 const sanitize = require("sanitize-html");
-const mongoConnection = require('../mongo/mongoConnection').connectToDatabase;
-const getGameDetails = require('../mongo/mongoActions').queryDatabaseForGameCode;
-const submitAnswerToDataBase = require('../mongo/mongoActions').submitAnswerToDataBase;
-const getUserAndGameIdFromConnection = require('../utilities').getUserAndGameIdFromConnection;
-const {informational, error, warning} = require('../logging/log');
-const getGameIdFromConnection = require('../utilities').getGameIdFromConnection;
+const mongoConnection = require('../../mongo/mongoConnection').connectToDatabase;
+const getGameDetails = require('../../mongo/mongoActions').queryDatabaseForGameCode;
+const submitAnswerToDataBase = require('../../mongo/mongoActions').submitAnswerToDataBase;
+const getUserAndGameIdFromConnection = require('../../utilities').getUserAndGameIdFromConnection;
+const {informational, error, warning} = require('../../logging/log');
+const getGameIdFromConnection = require('../../utilities').getGameIdFromConnection;
 
 const wsClient = new ws.Client();
 
@@ -31,11 +31,9 @@ async function submit(event, context, callback) {
     const userId = event.requestContext.authorizer['cognito:username'];
 
     // {"questionId":0, "answer":1, "type": "multipleChoice"}
-console.log("BEFORE GAME ID")
-await getGameIdFromConnection(event);
-console.log("AFTER get ID")
     try {
         let gameAndUserIdStatus = await getUserAndGameIdFromConnection(event);
+        console.log(gameAndUserIdStatus);
         if (!gameAndUserIdStatus.status == 'success') {
             let message = gameAndUserIdStatus.message;
             console.log('==> Error getting user ID and game ID ' + JSON.stringify(error));

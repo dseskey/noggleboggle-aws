@@ -1,0 +1,25 @@
+{
+  "name": "@nbt/game-service",
+  "version": "1.0.0",
+  "description": "Game management and WebSocket service for NBT",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@aws-sdk/client-apigatewaymanagementapi": "^3.450.0",
+    "@aws-sdk/client-eventbridge": "^3.450.0",
+    "@nbt/types": "^1.0.0",
+    "@nbt/database": "^1.0.0",
+    "jsonwebtoken": "^9.0.2",
+    "uuid": "^9.0.1"
+  },
+  "devDependencies": {
+    "@types/jsonwebtoken": "^9.0.5",
+    "@types/uuid": "^9.0.7",
+    "typescript": "^5.3.2"
+  }
+}

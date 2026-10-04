@@ -1,0 +1,397 @@
+service: nbt-backend
+
+frameworkVersion: '4'
+
+provider:
+  name: aws
+  runtime: nodejs20.x
+  stage: ${opt:stage, 'dev'}
+  region: ${opt:region, 'us-east-1'}
+  memorySize: 1024
+  timeout: 30
+  
+  environment:
+    STAGE: ${self:provider.stage}
+    REGION: ${self:provider.region}
+    DYNAMODB_TABLE: ${self:custom.tableName}
+    COGNITO_USER_POOL_ID: !Ref CognitoUserPool
+    COGNITO_USER_POOL_CLIENT_ID: !Ref CognitoUserPoolClient
+    WEBSOCKET_API_ENDPOINT: 
+      Fn::Sub: 'wss://${WebSocketApi}.execute-api.${AWS::Region}.amazonaws.com/${self:provider.stage}'
+    
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - dynamodb:Query
+            - dynamodb:Scan
+            - dynamodb:GetItem
+            - dynamodb:PutItem
+            - dynamodb:UpdateItem
+            - dynamodb:DeleteItem
+            - dynamodb:BatchGetItem
+            - dynamodb:BatchWriteItem
+            - dynamodb:TransactWrite
+            - dynamodb:TransactGet
+          Resource:
+            - !GetAtt MainTable.Arn
+            - !Sub "${MainTable.Arn}/index/*"
+        - Effect: Allow
+          Action:
+            - execute-api:ManageConnections
+          Resource:
+            - !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WebSocketApi}/*/*"
+        - Effect: Allow
+          Action:
+            - bedrock:InvokeModel
+            - bedrock:InvokeModelWithResponseStream
+          Resource: "*"
+        - Effect: Allow
+          Action:
+            - events:PutEvents
+          Resource: !GetAtt EventBus.Arn
+        - Effect: Allow
+          Action:
+            - logs:CreateLogGroup
+            - logs:CreateLogStream
+            - logs:PutLogEvents
+          Resource: "*"
+
+custom:
+  tableName: nbt-main-table-${self:provider.stage}
+  eventBusName: nbt-event-bus-${self:provider.stage}
+  
+  webpack:
+    webpackConfig: 'webpack.config.js'
+    includeModules: true
+    packager: 'npm'
+    
+  serverless-offline:
+    httpPort: 3000
+    websocketPort: 3001
+    
+functions:
+  # Auth Service Functions
+  auth-register:
+    handler: services/auth/src/handlers/register.handler
+    events:
+      - http:
+          path: /auth/register
+          method: post
+          cors: true
+          
+  auth-login:
+    handler: services/auth/src/handlers/login.handler
+    events:
+      - http:
+          path: /auth/login
+          method: post
+          cors: true
+          
+  auth-profile:
+    handler: services/auth/src/handlers/profile.handler
+    events:
+      - http:
+          path: /auth/profile
+          method: get
+          cors: true
+          authorizer:
+            name: cognitoAuthorizer
+            type: COGNITO_USER_POOLS
+            arn: !GetAtt CognitoUserPool.Arn
+      - http:
+          path: /auth/profile
+          method: put
+          cors: true
+          authorizer:
+            name: cognitoAuthorizer
+            type: COGNITO_USER_POOLS
+            arn: !GetAtt CognitoUserPool.Arn
+
+  # WebSocket Functions
+  websocket-connect:
+    handler: services/game/src/handlers/websocket.connectHandler
+    events:
+      - websocket:
+          route: $connect
+          authorizer:
+            name: websocketAuthorizer
+            identitySource:
+              - route.request.querystring.token
+              
+  websocket-disconnect:
+    handler: services/game/src/handlers/websocket.disconnectHandler
+    events:
+      - websocket:
+          route: $disconnect
+          
+  websocket-default:
+    handler: services/game/src/handlers/websocket.defaultHandler
+    events:
+      - websocket:
+          route: $default
+          
+  # Game Management Functions
+  game-create:
+    handler: services/game/src/handlers/game.createHandler
+    events:
+      - websocket:
+          route: createGame
+          
+  game-join:
+    handler: services/game/src/handlers/game.joinHandler
+    events:
+      - websocket:
+          route: joinGame
+          
+  game-start:
+    handler: services/game/src/handlers/game.startHandler
+    events:
+      - websocket:
+          route: startGame
+          
+  game-next-question:
+    handler: services/game/src/handlers/game.nextQuestionHandler
+    events:
+      - websocket:
+          route: nextQuestion
+          
+  game-submit-answer:
+    handler: services/game/src/handlers/game.submitAnswerHandler
+    events:
+      - websocket:
+          route: submitAnswer
+          
+  # Question Service Functions
+  question-create:
+    handler: services/question/src/handlers/question.createHandler
+    events:
+      - http:
+          path: /questions
+          method: post
+          cors: true
+          authorizer:
+            name: cognitoAuthorizer
+            type: COGNITO_USER_POOLS
+            arn: !GetAtt CognitoUserPool.Arn
+            
+  question-list:
+    handler: services/question/src/handlers/question.listHandler
+    events:
+      - http:
+          path: /questions
+          method: get
+          cors: true
+          
+  question-generate:
+    handler: services/question/src/handlers/ai.generateHandler
+    timeout: 60
+    events:
+      - http:
+          path: /questions/generate
+          method: post
+          cors: true
+          authorizer:
+            name: cognitoAuthorizer
+            type: COGNITO_USER_POOLS
+            arn: !GetAtt CognitoUserPool.Arn
+
+  # Event Processing Functions
+  event-processor:
+    handler: services/game/src/handlers/events.processor
+    events:
+      - eventBridge:
+          eventBus: !Ref EventBus
+          pattern:
+            source: ["nbt.game", "nbt.score", "nbt.user"]
+            
+  # WebSocket Authorizer
+  websocket-authorizer:
+    handler: services/auth/src/handlers/websocketAuth.handler
+
+resources:
+  Resources:
+    # DynamoDB Main Table
+    MainTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:custom.tableName}
+        AttributeDefinitions:
+          - AttributeName: PK
+            AttributeType: S
+          - AttributeName: SK
+            AttributeType: S
+          - AttributeName: GSI1PK
+            AttributeType: S
+          - AttributeName: GSI1SK
+            AttributeType: S
+          - AttributeName: GSI2PK
+            AttributeType: S
+          - AttributeName: GSI2SK
+            AttributeType: S
+        KeySchema:
+          - AttributeName: PK
+            KeyType: HASH
+          - AttributeName: SK
+            KeyType: RANGE
+        GlobalSecondaryIndexes:
+          - IndexName: GSI1
+            KeySchema:
+              - AttributeName: GSI1PK
+                KeyType: HASH
+              - AttributeName: GSI1SK
+                KeyType: RANGE
+            Projection:
+              ProjectionType: ALL
+          - IndexName: GSI2
+            KeySchema:
+              - AttributeName: GSI2PK
+                KeyType: HASH
+              - AttributeName: GSI2SK
+                KeyType: RANGE
+            Projection:
+              ProjectionType: ALL
+        BillingMode: PAY_PER_REQUEST
+        StreamSpecification:
+          StreamViewType: NEW_AND_OLD_IMAGES
+        PointInTimeRecoverySpecification:
+          PointInTimeRecoveryEnabled: true
+        Tags:
+          - Key: Service
+            Value: nbt-backend
+          - Key: Stage
+            Value: ${self:provider.stage}
+
+    # Cognito User Pool
+    CognitoUserPool:
+      Type: AWS::Cognito::UserPool
+      Properties:
+        UserPoolName: nbt-users-${self:provider.stage}
+        Schema:
+          - Name: email
+            AttributeDataType: String
+            Mutable: true
+            Required: true
+          - Name: preferred_username
+            AttributeDataType: String
+            Mutable: true
+            Required: false
+        Policies:
+          PasswordPolicy:
+            MinimumLength: 8
+            RequireUppercase: true
+            RequireLowercase: true
+            RequireNumbers: true
+            RequireSymbols: false
+        UsernameAttributes:
+          - email
+        AutoVerifiedAttributes:
+          - email
+        EmailConfiguration:
+          EmailSendingAccount: COGNITO_DEFAULT
+        MfaConfiguration: OPTIONAL
+        EnabledMfas:
+          - SOFTWARE_TOKEN_MFA
+        UserPoolTags:
+          Service: nbt-backend
+          Stage: ${self:provider.stage}
+
+    # Cognito User Pool Client
+    CognitoUserPoolClient:
+      Type: AWS::Cognito::UserPoolClient
+      Properties:
+        ClientName: nbt-web-client-${self:provider.stage}
+        UserPoolId: !Ref CognitoUserPool
+        GenerateSecret: false
+        ExplicitAuthFlows:
+          - ADMIN_NO_SRP_AUTH
+          - USER_PASSWORD_AUTH
+          - ALLOW_USER_SRP_AUTH
+          - ALLOW_REFRESH_TOKEN_AUTH
+        SupportedIdentityProviders:
+          - COGNITO
+        CallbackURLs:
+          - https://localhost:3000/auth/callback
+        LogoutURLs:
+          - https://localhost:3000/auth/logout
+        AllowedOAuthFlows:
+          - code
+          - implicit
+        AllowedOAuthFlowsUserPoolClient: true
+        AllowedOAuthScopes:
+          - email
+          - openid
+          - profile
+        RefreshTokenValidity: 30
+        AccessTokenValidity: 24
+        IdTokenValidity: 24
+        TokenValidityUnits:
+          AccessToken: hours
+          IdToken: hours
+          RefreshToken: days
+
+    # EventBridge Custom Bus
+    EventBus:
+      Type: AWS::Events::EventBus
+      Properties:
+        Name: ${self:custom.eventBusName}
+        Tags:
+          - Key: Service
+            Value: nbt-backend
+          - Key: Stage
+            Value: ${self:provider.stage}
+
+    # WebSocket API
+    WebSocketApi:
+      Type: AWS::ApiGatewayV2::Api
+      Properties:
+        Name: nbt-websocket-${self:provider.stage}
+        ProtocolType: WEBSOCKET
+        RouteSelectionExpression: $request.body.action
+        Tags:
+          Service: nbt-backend
+          Stage: ${self:provider.stage}
+
+    # WebSocket API Stage
+    WebSocketStage:
+      Type: AWS::ApiGatewayV2::Stage
+      Properties:
+        ApiId: !Ref WebSocketApi
+        StageName: ${self:provider.stage}
+        AutoDeploy: true
+        DefaultRouteSettings:
+          ThrottlingBurstLimit: 5000
+          ThrottlingRateLimit: 2000
+        Tags:
+          Service: nbt-backend
+          Stage: ${self:provider.stage}
+
+  Outputs:
+    UserPoolId:
+      Description: Cognito User Pool ID
+      Value: !Ref CognitoUserPool
+      Export:
+        Name: ${self:service}-${self:provider.stage}-UserPoolId
+        
+    UserPoolClientId:
+      Description: Cognito User Pool Client ID
+      Value: !Ref CognitoUserPoolClient
+      Export:
+        Name: ${self:service}-${self:provider.stage}-UserPoolClientId
+        
+    WebSocketApiEndpoint:
+      Description: WebSocket API Endpoint
+      Value: !Sub 'wss://${WebSocketApi}.execute-api.${AWS::Region}.amazonaws.com/${self:provider.stage}'
+      Export:
+        Name: ${self:service}-${self:provider.stage}-WebSocketEndpoint
+        
+    EventBusArn:
+      Description: EventBridge Custom Bus ARN
+      Value: !GetAtt EventBus.Arn
+      Export:
+        Name: ${self:service}-${self:provider.stage}-EventBusArn
+
+plugins:
+  - serverless-webpack
+  - serverless-offline

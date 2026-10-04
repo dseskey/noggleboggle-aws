@@ -1,0 +1,41 @@
+{
+  "name": "nbt-backend",
+  "version": "1.0.0",
+  "description": "Noggle Boggle Trivia - Backend Services",
+  "private": true,
+  "workspaces": [
+    "services/*",
+    "shared/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces",
+    "test": "npm run test --workspaces",
+    "lint": "eslint . --ext .ts,.js",
+    "lint:fix": "eslint . --ext .ts,.js --fix",
+    "deploy:dev": "npm run deploy:dev --workspaces",
+    "deploy:prod": "npm run deploy:prod --workspaces",
+    "local": "serverless offline start",
+    "clean": "npm run clean --workspaces && rm -rf node_modules"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "@typescript-eslint/eslint-plugin": "^6.13.0",
+    "@typescript-eslint/parser": "^6.13.0",
+    "eslint": "^8.54.0",
+    "jest": "^29.7.0",
+    "@types/jest": "^29.5.8",
+    "ts-jest": "^29.1.1",
+    "typescript": "^5.3.2",
+    "serverless": "^4.0.0",
+    "serverless-offline": "^13.3.0",
+    "serverless-webpack": "^5.13.0",
+    "webpack": "^5.89.0",
+    "ts-loader": "^9.5.1"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "npm": ">=10.0.0"
+  },
+  "author": "NBT Team",
+  "license": "MIT"
+}
